@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Numbero</title>
-  <meta name="description" content="Mesin pengenal angka dengan visualisasi image processing real-time" />
+  <title>CharScan — AI Character Recognition</title>
+  <meta name="description" content="Pengenal karakter angka berbasis SVM dengan visualisasi image processing real-time" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Clash+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
@@ -116,7 +116,7 @@
     .hero {
       padding: 80px 40px 60px;
       max-width: 1100px; margin: 0 auto;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
+      display: flex; flex-direction: column; align-items: flex-start; max-width: 640px;
     }
     .hero-eyebrow {
       display: inline-flex; align-items: center; gap: 8px;
@@ -141,6 +141,9 @@
     .stat { }
     .stat-val { font-family: var(--fd); font-size: 28px; font-weight: 700; color: var(--white); line-height: 1; }
     .stat-label { font-size: 11px; color: var(--mist); margin-top: 4px; font-family: var(--fm); letter-spacing: 1px; }
+
+    /* hero right — pipeline preview chips */
+
 
     /* ════════════════════════════════════════════
        MAIN CONTENT
@@ -288,6 +291,117 @@
     .err-text { font-size: 12px; color: var(--rose); line-height: 1.6; }
 
     /* ════════════════════════════════════════════
+       RIGHT PANEL — PIPELINE
+    ════════════════════════════════════════════ */
+    .right-panel { display: flex; flex-direction: column; gap: 16px; }
+
+    /* empty state */
+    .empty-state {
+      background: var(--ink-2); border: 1px dashed var(--line);
+      border-radius: var(--r-xl); padding: 60px 40px; text-align: center;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+    .empty-title { font-family: var(--fd); font-size: 18px; font-weight: 600; color: var(--snow); margin-bottom: 8px; }
+    .empty-desc { font-size: 13px; color: var(--mist); line-height: 1.7; max-width: 300px; margin: 0 auto; }
+
+    /* pipeline card */
+    .pipe-card {
+      background: var(--ink-2); border: 1px solid var(--line);
+      border-radius: var(--r-xl); overflow: hidden;
+      display: none;
+    }
+    .pipe-card.show { display: block; animation: fadeUp .4s ease both; }
+    .pipe-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px; border-bottom: 1px solid var(--line);
+    }
+    .pipe-card-title { font-family: var(--fd); font-size: 16px; font-weight: 600; }
+    .pipe-card-sub { font-size: 11px; color: var(--mist); margin-top: 2px; font-family: var(--fm); }
+    .pipe-progress {
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--fm); font-size: 11px; color: var(--mist);
+    }
+    .prog-bar {
+      width: 80px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden;
+    }
+    .prog-fill {
+      height: 100%; background: var(--lime); border-radius: 2px; width: 0;
+      transition: width .4s ease;
+    }
+
+    /* steps list */
+    .steps-list { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .step-row {
+      display: grid; grid-template-columns: 36px 1fr 120px; gap: 14px;
+      align-items: start;
+      background: var(--ink-3); border: 1px solid var(--line);
+      border-radius: var(--r-md); padding: 16px;
+      opacity: 0; transform: translateX(-8px);
+      transition: opacity .35s ease, transform .35s ease, border-color .3s ease;
+    }
+    .step-row.active { opacity: 1; transform: translateX(0); }
+    .step-row.done { border-color: rgba(184,255,87,.2); }
+
+    .step-idx {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      background: var(--ink-4); border: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: .3s;
+    }
+    .step-row.done .step-idx { background: var(--lime-dim); border-color: rgba(184,255,87,.3); }
+
+    .step-body { }
+    .step-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .step-name { font-size: 13px; font-weight: 600; color: var(--white); }
+    .step-badge {
+      font-family: var(--fm); font-size: 9px; letter-spacing: 1px;
+      background: var(--line); color: var(--mist);
+      padding: 2px 7px; border-radius: 4px; text-transform: uppercase;
+      transition: .3s;
+    }
+    .step-row.done .step-badge { background: var(--lime-dim); color: var(--lime); }
+    .step-desc-txt { font-size: 11px; color: var(--mist); line-height: 1.6; margin-bottom: 10px; }
+    .step-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .tag {
+      font-family: var(--fm); font-size: 9px; color: var(--mist);
+      background: var(--ink-4); border: 1px solid var(--line);
+      padding: 2px 7px; border-radius: 4px;
+    }
+
+    /* canvas col */
+    .step-canvas-col { }
+    .step-canvas-wrap {
+      background: var(--ink); border: 1px solid var(--line);
+      border-radius: var(--r-sm); overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 72px; aspect-ratio: 4/3;
+    }
+    .step-canvas-wrap canvas { max-width: 100%; height: auto; display: block; image-rendering: pixelated; }
+    .cv-ph { font-size: 10px; color: var(--mist); text-align: center; padding: 16px; font-family: var(--fm); }
+    .step-cv-label { font-size: 9px; color: var(--mist); text-align: center; margin-top: 5px; font-family: var(--fm); letter-spacing: 1px; text-transform: uppercase; }
+
+    /* HOG double canvas */
+    .hog-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .hog-item { }
+
+    /* SVM decision viz */
+    .svm-classes {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 12px;
+    }
+    .cls-chip {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--fd); font-size: 14px; font-weight: 700;
+      background: var(--ink-4); color: var(--mist); border: 1px solid var(--line);
+      transition: .3s;
+    }
+    .cls-chip.winner {
+      background: var(--lime); color: #000; border-color: var(--lime);
+      box-shadow: 0 0 20px var(--lime-glow);
+      transform: scale(1.12);
+    }
+
+    /* ════════════════════════════════════════════
        RESULT CARD
     ════════════════════════════════════════════ */
     .result-banner {
@@ -363,19 +477,13 @@
     h1            { animation: fadeDown .5s .2s ease both; }
     .hero-desc    { animation: fadeDown .5s .3s ease both; }
     .hero-stats   { animation: fadeDown .5s .4s ease both; }
-    .pipe-chip:nth-child(1){ animation: fadeUp .4s .3s ease both; }
-    .pipe-chip:nth-child(2){ animation: fadeUp .4s .4s ease both; }
-    .pipe-chip:nth-child(3){ animation: fadeUp .4s .5s ease both; }
-    .pipe-chip:nth-child(4){ animation: fadeUp .4s .6s ease both; }
-    .pipe-chip:nth-child(5){ animation: fadeUp .4s .7s ease both; }
-    .pipe-chip:nth-child(6){ animation: fadeUp .4s .8s ease both; }
+
 
     /* ════════════════════════════════════════════
        RESPONSIVE
     ════════════════════════════════════════════ */
     @media(max-width:900px){
       .hero { grid-template-columns:1fr; gap:40px; padding:48px 24px 40px; }
-      .hero-right { display:none; }
       .main { grid-template-columns:1fr; padding:0 20px 80px; }
       nav { padding:16px 20px; }
       .nav-pills { display:none; }
@@ -439,14 +547,7 @@
         </div>
       </div>
     </div>
-    <div class="hero-right">
-      <div class="pipe-chip"><div class="pipe-chip-num">01</div><div class="pipe-chip-text"><div class="pipe-chip-name">Upload Gambar</div><div class="pipe-chip-desc">JPG / PNG karakter tunggal</div></div><div class="pipe-chip-arrow">→</div></div>
-      <div class="pipe-chip"><div class="pipe-chip-num">02</div><div class="pipe-chip-text"><div class="pipe-chip-name">Resize 21×15px</div><div class="pipe-chip-desc">Normalisasi dimensi input</div></div><div class="pipe-chip-arrow">→</div></div>
-      <div class="pipe-chip"><div class="pipe-chip-num">03</div><div class="pipe-chip-text"><div class="pipe-chip-name">Grayscale</div><div class="pipe-chip-desc">Eliminasi informasi warna</div></div><div class="pipe-chip-arrow">→</div></div>
-      <div class="pipe-chip"><div class="pipe-chip-num">04</div><div class="pipe-chip-text"><div class="pipe-chip-name">Otsu Threshold</div><div class="pipe-chip-desc">Binarisasi adaptif</div></div><div class="pipe-chip-arrow">→</div></div>
-      <div class="pipe-chip"><div class="pipe-chip-num">05</div><div class="pipe-chip-text"><div class="pipe-chip-name">HOG Features</div><div class="pipe-chip-desc">Histogram of Oriented Gradients</div></div><div class="pipe-chip-arrow">→</div></div>
-      <div class="pipe-chip"><div class="pipe-chip-num">06</div><div class="pipe-chip-text"><div class="pipe-chip-name">SVM Classifier</div><div class="pipe-chip-desc">Prediksi dengan kernel RBF</div></div><div class="pipe-chip-arrow">→</div></div>
-    </div>
+
   </section>
 
   <!-- ── MAIN ── -->
