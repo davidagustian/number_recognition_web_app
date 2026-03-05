@@ -3,786 +3,1116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SVM — Pengenal Karakter</title>
+  <title>CharScan — AI Character Recognition</title>
+  <meta name="description" content="Pengenal karakter angka berbasis SVM dengan visualisasi image processing real-time" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
-
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Clash+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
+    /* ════════════════════════════════════════════
+       RESET & TOKENS
+    ════════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #07080f;
-      --surface:  #0e0f1a;
-      --surface2: #13141f;
-      --border:   #1c1d2e;
-      --accent:   #00e5a0;
-      --accent2:  #ff6b35;
-      --accent3:  #7c6dfa;
-      --text:     #dde0f0;
-      --muted:    #4a4d6a;
-      --danger:   #ff4757;
-      --fh: 'Syne', sans-serif;
-      --fm: 'Space Mono', monospace;
-      --ease: cubic-bezier(0.4,0,0.2,1);
+      /* palette */
+      --ink:        #080910;
+      --ink-2:      #0d0f1c;
+      --ink-3:      #131528;
+      --ink-4:      #1a1d30;
+      --line:       #222540;
+      --line-2:     #2d3150;
+      --mist:       #4a5080;
+      --fog:        #6b72a0;
+      --snow:       #c8ccec;
+      --white:      #eef0fb;
+      --lime:       #b8ff57;
+      --lime-dim:   rgba(184,255,87,.12);
+      --lime-glow:  rgba(184,255,87,.35);
+      --cyan:       #3df5e0;
+      --orange:     #ff7a3d;
+      --rose:       #ff4f7b;
+      /* type */
+      --fd: 'Clash Display', sans-serif;
+      --fi: 'Inter', sans-serif;
+      --fm: 'DM Mono', monospace;
+      /* space */
+      --r-sm: 10px;
+      --r-md: 16px;
+      --r-lg: 24px;
+      --r-xl: 32px;
     }
 
     html { scroll-behavior: smooth; }
-
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--fm);
+      background: var(--ink);
+      color: var(--white);
+      font-family: var(--fi);
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
-    /* grid bg */
-    body::before {
-      content:'';
-      position:fixed; inset:0;
-      background-image:
-        linear-gradient(rgba(0,229,160,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,229,160,.025) 1px, transparent 1px);
-      background-size: 48px 48px;
-      pointer-events:none; z-index:0;
+    /* ── Noise grain overlay ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 9999; opacity: .5;
     }
 
-    .wrap {
-      position:relative; z-index:1;
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 56px 24px 96px;
+    /* ── Ambient blobs ── */
+    .blob {
+      position: fixed; border-radius: 50%;
+      filter: blur(120px); pointer-events: none; z-index: 0;
     }
+    .blob-1 { width:500px; height:500px; top:-120px; left:-160px; background:rgba(184,255,87,.06); }
+    .blob-2 { width:400px; height:400px; bottom:0; right:-100px; background:rgba(61,245,224,.05); }
+    .blob-3 { width:300px; height:300px; top:40%; left:50%; transform:translateX(-50%); background:rgba(255,74,123,.04); }
 
-    /* ── Header ── */
-    .header {
-      text-align:center;
-      margin-bottom: 52px;
-      animation: fadeDown .6s ease both;
+    /* ════════════════════════════════════════════
+       LAYOUT
+    ════════════════════════════════════════════ */
+    .page { position: relative; z-index: 1; }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+      background: rgba(8,9,16,.7);
+      position: sticky; top: 0; z-index: 100;
     }
-    .badge {
-      display:inline-flex; align-items:center; gap:8px;
-      font-size:10px; letter-spacing:3px; text-transform:uppercase;
-      color:var(--accent); border:1px solid rgba(0,229,160,.3);
-      padding:5px 16px; border-radius:100px; margin-bottom:22px;
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--fd); font-size: 20px; font-weight: 700;
+      color: var(--white); text-decoration: none;
     }
-    .badge-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:blink 2s ease infinite; }
+    .logo-badge {
+      background: var(--lime); color: #000;
+      font-family: var(--fm); font-size: 9px; font-weight: 500;
+      padding: 3px 8px; border-radius: 4px; letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .nav-pills { display: flex; align-items: center; gap: 8px; }
+    .nav-pill {
+      font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--mist); padding: 6px 14px; border-radius: 100px;
+      border: 1px solid var(--line); transition: .2s;
+      font-family: var(--fm);
+    }
+    .nav-pill:hover { color: var(--white); border-color: var(--line-2); }
+    .nav-pill.active { color: var(--lime); border-color: rgba(184,255,87,.3); background: var(--lime-dim); }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--mist); font-family: var(--fm);
+    }
+    .s-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mist); flex-shrink: 0; }
+    .s-dot.live { background: var(--lime); box-shadow: 0 0 10px var(--lime-glow); animation: pulse-dot 2s ease infinite; }
+    .s-dot.err  { background: var(--rose); }
+
+    /* ════════════════════════════════════════════
+       HERO
+    ════════════════════════════════════════════ */
+    .hero {
+      padding: 80px 40px 60px;
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--fm); font-size: 11px; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--lime);
+      margin-bottom: 24px;
+    }
+    .hero-eyebrow::before { content:''; width:24px; height:1px; background:var(--lime); }
     h1 {
-      font-family:var(--fh); font-size:clamp(2.2rem,6vw,3.6rem);
-      font-weight:800; line-height:1.05; letter-spacing:-1.5px;
-      margin-bottom:14px;
-      background: linear-gradient(135deg,#fff 20%, var(--accent) 80%);
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      font-family: var(--fd); font-size: clamp(2.6rem, 4.5vw, 4rem);
+      font-weight: 700; line-height: 1.06; letter-spacing: -1px;
+      margin-bottom: 20px; color: var(--white);
     }
-    .subtitle { color:var(--muted); font-size:13px; line-height:1.8; max-width:460px; margin:0 auto; }
+    h1 em { font-style: normal; color: var(--lime); }
+    .hero-desc {
+      font-size: 15px; line-height: 1.8; color: var(--fog);
+      margin-bottom: 32px; max-width: 440px;
+    }
+    .hero-stats {
+      display: flex; gap: 28px;
+    }
+    .stat { }
+    .stat-val { font-family: var(--fd); font-size: 28px; font-weight: 700; color: var(--white); line-height: 1; }
+    .stat-label { font-size: 11px; color: var(--mist); margin-top: 4px; font-family: var(--fm); letter-spacing: 1px; }
 
-    /* ── Card ── */
-    .card {
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:18px;
-      padding:32px;
-      margin-bottom:18px;
+    /* hero right — pipeline preview chips */
+    .hero-right { display: flex; flex-direction: column; gap: 10px; }
+    .pipe-chip {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--ink-2); border: 1px solid var(--line);
+      border-radius: var(--r-md); padding: 14px 18px;
+      transition: .25s; cursor: default;
     }
-    .card-title {
-      font-size:10px; letter-spacing:3px; text-transform:uppercase;
-      color:var(--muted); margin-bottom:20px;
-      display:flex; align-items:center; gap:10px;
+    .pipe-chip:hover { border-color: var(--line-2); background: var(--ink-3); transform: translateX(4px); }
+    .pipe-chip-num {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      background: var(--lime-dim); color: var(--lime);
+      font-family: var(--fm); font-size: 11px; font-weight: 500;
+      display: flex; align-items: center; justify-content: center;
     }
-    .card-title::after { content:''; flex:1; height:1px; background:var(--border); }
+    .pipe-chip-text { }
+    .pipe-chip-name { font-size: 13px; font-weight: 600; color: var(--white); }
+    .pipe-chip-desc { font-size: 11px; color: var(--mist); margin-top: 2px; }
+    .pipe-chip-arrow { margin-left: auto; color: var(--mist); font-size: 14px; transition: .2s; }
+    .pipe-chip:hover .pipe-chip-arrow { color: var(--lime); transform: translateX(2px); }
+
+    /* ════════════════════════════════════════════
+       MAIN CONTENT
+    ════════════════════════════════════════════ */
+    .main {
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 40px 100px;
+      display: grid; grid-template-columns: 420px 1fr; gap: 24px;
+      align-items: start;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--ink-2);
+      border: 1px solid var(--line);
+      border-radius: var(--r-xl);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 20px 24px 0;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-title {
+      font-family: var(--fm); font-size: 10px; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--mist);
+    }
+    .panel-body { padding: 24px; }
 
     /* ── Config ── */
-    .input-row { display:flex; gap:10px; }
+    .field-label {
+      font-size: 11px; color: var(--mist); font-family: var(--fm);
+      letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .inp-wrap { position: relative; }
+    .inp-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; }
     .inp {
-      flex:1; background:var(--bg); border:1px solid var(--border);
-      border-radius:10px; color:var(--text); font-family:var(--fm);
-      font-size:12px; padding:12px 16px; outline:none;
-      transition:border-color .2s var(--ease);
+      width: 100%; background: var(--ink-3); border: 1px solid var(--line);
+      border-radius: var(--r-sm); color: var(--white); font-family: var(--fm);
+      font-size: 12px; padding: 12px 14px 12px 38px; outline: none;
+      transition: border-color .2s, box-shadow .2s;
     }
-    .inp:focus { border-color:var(--accent); }
-    .inp::placeholder { color:var(--muted); }
+    .inp:focus { border-color: rgba(184,255,87,.5); box-shadow: 0 0 0 3px rgba(184,255,87,.08); }
+    .inp::placeholder { color: var(--mist); }
+    .inp-hint { font-size: 10px; color: var(--mist); margin-top: 6px; font-family: var(--fm); }
 
-    /* ── Upload ── */
-    .drop {
-      border:2px dashed var(--border); border-radius:12px;
-      padding:44px 24px; text-align:center; cursor:pointer;
-      transition:.25s var(--ease); position:relative; overflow:hidden;
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--line); margin: 20px 0; }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--line-2);
+      border-radius: var(--r-lg);
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: .25s;
+      position: relative;
+      background: var(--ink-3);
     }
-    .drop:hover,.drop.over { border-color:var(--accent); background:rgba(0,229,160,.04); }
-    .drop-icon { font-size:38px; margin-bottom:12px; display:block; }
-    .drop-title { font-family:var(--fh); font-size:15px; font-weight:600; margin-bottom:6px; }
-    .drop-hint { font-size:12px; color:var(--muted); }
-    .drop-hint span { color:var(--accent); text-decoration:underline; cursor:pointer; }
-    #fi { display:none; }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--lime);
+      background: var(--lime-dim);
+    }
+    .drop-zone.over::before {
+      content: '';
+      position: absolute; inset: 0; border-radius: var(--r-lg);
+      background: rgba(184,255,87,.06);
+      animation: ripple 1s ease infinite;
+    }
+    .dz-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: var(--ink-4); border: 1px solid var(--line-2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin: 0 auto 16px;
+    }
+    .dz-title { font-family: var(--fd); font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .dz-sub { font-size: 12px; color: var(--mist); line-height: 1.6; }
+    .dz-sub b { color: var(--lime); font-weight: 500; cursor: pointer; }
+    .dz-formats {
+      display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 14px;
+    }
+    .fmt-tag {
+      font-family: var(--fm); font-size: 9px; letter-spacing: 1px;
+      background: var(--ink-4); border: 1px solid var(--line); color: var(--mist);
+      padding: 3px 8px; border-radius: 4px; text-transform: uppercase;
+    }
+    #fi { display: none; }
 
-    /* preview bar */
+    /* ── Preview bar ── */
     .prev-bar {
-      display:none; align-items:center; gap:16px;
-      margin-top:18px; padding:14px 16px;
-      background:var(--bg); border-radius:10px; border:1px solid var(--border);
+      display: none; align-items: center; gap: 14px;
+      background: var(--ink-3); border: 1px solid var(--line);
+      border-radius: var(--r-md); padding: 12px 16px; margin-top: 14px;
     }
-    .prev-bar.show { display:flex; }
-    #prevImg { width:56px; height:56px; object-fit:contain; border-radius:6px;
-               border:1px solid var(--border); background:#fff; padding:3px; image-rendering:pixelated; }
-    .prev-info { flex:1; min-width:0; }
-    .prev-name { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .prev-size { font-size:11px; color:var(--muted); margin-top:2px; }
-    .btn-clear { background:none; border:1px solid var(--border); color:var(--muted);
-                 font-family:var(--fm); font-size:11px; padding:6px 12px; border-radius:6px;
-                 cursor:pointer; transition:.2s; }
-    .btn-clear:hover { border-color:var(--danger); color:var(--danger); }
+    .prev-bar.show { display: flex; }
+    #prevImg {
+      width: 52px; height: 52px; object-fit: contain; border-radius: 8px;
+      background: #fff; padding: 3px; image-rendering: pixelated;
+      border: 1px solid var(--line);
+    }
+    .prev-info { flex: 1; min-width: 0; }
+    .prev-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prev-meta { font-size: 10px; color: var(--mist); margin-top: 3px; font-family: var(--fm); }
+    .btn-rm {
+      background: none; border: 1px solid var(--line); color: var(--mist);
+      font-family: var(--fm); font-size: 10px; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+      transition: .2s; flex-shrink: 0;
+    }
+    .btn-rm:hover { border-color: var(--rose); color: var(--rose); }
 
-    /* ── Predict Button ── */
-    .btn-pred {
-      width:100%; padding:16px; margin-top:18px;
-      background:var(--accent); color:#000;
-      font-family:var(--fh); font-size:15px; font-weight:700;
-      border:none; border-radius:12px; cursor:pointer;
-      transition:.25s var(--ease); position:relative; overflow:hidden;
+    /* ── CTA Button ── */
+    .btn-run {
+      width: 100%; padding: 15px;
+      background: var(--lime); color: #000;
+      font-family: var(--fd); font-size: 15px; font-weight: 700;
+      border: none; border-radius: var(--r-md); cursor: pointer;
+      transition: .25s; margin-top: 16px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      position: relative; overflow: hidden;
     }
-    .btn-pred:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,229,160,.35); }
-    .btn-pred:disabled { opacity:.35; cursor:not-allowed; }
-    .btn-pred.loading::after {
-      content:''; position:absolute; inset:0;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
-      animation:shimmer 1.2s ease infinite;
+    .btn-run:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px var(--lime-glow);
     }
-
-    /* ── Pipeline Section ── */
-    .pipeline-section {
-      display:none;
-      animation: fadeUp .5s ease both;
+    .btn-run:disabled { opacity: .3; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-run.loading { pointer-events: none; }
+    .btn-run.loading::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent);
+      animation: shimmer 1.4s ease infinite;
     }
-    .pipeline-section.show { display:block; }
-
-    .pipeline-header {
-      display:flex; align-items:center; gap:12px;
-      margin-bottom:24px;
-    }
-    .pipeline-title {
-      font-family:var(--fh); font-size:18px; font-weight:700;
-    }
-    .pipeline-subtitle { font-size:11px; color:var(--muted); margin-top:2px; }
-
-    /* steps grid */
-    .steps-grid {
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap:14px;
-      margin-bottom:18px;
-    }
-
-    .step-card {
-      background:var(--surface2);
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:18px;
-      position:relative;
-      overflow:hidden;
-      opacity:0;
-      transform:translateY(16px);
-      transition: opacity .4s ease, transform .4s ease, border-color .3s ease;
-    }
-    .step-card.active {
-      opacity:1; transform:translateY(0);
-      border-color: rgba(0,229,160,.25);
-    }
-    .step-card.active.done { border-color: rgba(0,229,160,.5); }
-
-    /* step number badge */
-    .step-num {
-      position:absolute; top:14px; right:14px;
-      width:22px; height:22px; border-radius:50%;
-      background:var(--border); color:var(--muted);
-      font-size:10px; font-weight:700;
-      display:flex; align-items:center; justify-content:center;
-      transition:.3s;
-    }
-    .step-card.done .step-num {
-      background:var(--accent); color:#000;
-    }
-
-    .step-icon { font-size:26px; margin-bottom:10px; display:block; }
-    .step-name {
-      font-family:var(--fh); font-size:13px; font-weight:700;
-      margin-bottom:4px; color:var(--text);
-    }
-    .step-desc { font-size:10px; color:var(--muted); line-height:1.6; margin-bottom:12px; }
-
-    /* canvas wrapper */
-    .canvas-wrap {
-      background:var(--bg);
-      border-radius:8px;
-      border:1px solid var(--border);
-      overflow:hidden;
-      display:flex; align-items:center; justify-content:center;
-      min-height:80px;
-      position:relative;
-    }
-    .canvas-wrap canvas {
-      max-width:100%; height:auto;
-      image-rendering:pixelated;
-      display:block;
-    }
-    .canvas-placeholder {
-      font-size:10px; color:var(--muted);
-      padding:20px; text-align:center;
-    }
-
-    /* step meta */
-    .step-meta {
-      margin-top:10px;
-      display:flex; flex-wrap:wrap; gap:6px;
-    }
-    .meta-tag {
-      font-size:9px; letter-spacing:1px; text-transform:uppercase;
-      background:var(--border); color:var(--muted);
-      padding:3px 8px; border-radius:4px;
-    }
-    .meta-tag.green { background:rgba(0,229,160,.12); color:var(--accent); }
-
-    /* progress bar between steps */
-    .step-connector {
-      display:flex; align-items:center; justify-content:center;
-      color:var(--muted); font-size:18px; margin:0 -4px;
-      opacity:0; transition:opacity .4s ease;
-    }
-    .step-connector.show { opacity:1; }
-
-    /* HOG viz */
-    .hog-wrap {
-      display:grid; grid-template-columns:1fr 1fr; gap:8px;
-    }
-    .hog-label { font-size:9px; color:var(--muted); text-align:center; margin-top:4px; }
-
-    /* ── Result ── */
-    .result-card { display:none; animation:fadeUp .4s ease both; }
-    .result-card.show { display:block; }
-
-    .result-inner {
-      display:flex; align-items:center; gap:28px;
-      padding:8px 0;
-    }
-    .result-digit {
-      font-family:var(--fh); font-size:88px; font-weight:800;
-      color:var(--accent); line-height:1; min-width:90px; text-align:center;
-      text-shadow:0 0 48px rgba(0,229,160,.5);
-      animation:popIn .5s cubic-bezier(.175,.885,.32,1.275) both;
-    }
-    .result-meta { flex:1; }
-    .result-label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
-    .result-value { font-family:var(--fh); font-size:20px; font-weight:700; margin-bottom:14px; }
-    .conf-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:6px; }
-    .conf-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:2px; width:0; transition:width .8s var(--ease); }
-    .conf-text { font-size:11px; color:var(--muted); }
-
-    /* ── Pipeline Summary ── */
-    .summary-row {
-      display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;
-    }
-    .summary-chip {
-      display:flex; align-items:center; gap:6px;
-      background:var(--surface2); border:1px solid var(--border);
-      border-radius:8px; padding:8px 14px;
-      font-size:11px; color:var(--muted);
-    }
-    .summary-chip .chip-val { color:var(--text); font-weight:700; margin-left:2px; }
+    .btn-icon { font-size: 16px; }
 
     /* ── Error ── */
-    .err {
-      display:none; background:rgba(255,71,87,.08); border:1px solid rgba(255,71,87,.3);
-      border-radius:10px; padding:14px 18px; font-size:12px; color:var(--danger); margin-top:14px;
+    .err-box {
+      display: none; align-items: flex-start; gap: 10px;
+      background: rgba(255,79,123,.08); border: 1px solid rgba(255,79,123,.25);
+      border-radius: var(--r-sm); padding: 12px 16px; margin-top: 14px;
     }
-    .err.show { display:block; }
+    .err-box.show { display: flex; }
+    .err-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .err-text { font-size: 12px; color: var(--rose); line-height: 1.6; }
 
-    /* ── Status ── */
-    .status-row { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:28px; font-size:11px; color:var(--muted); }
-    .dot { width:6px; height:6px; border-radius:50%; background:var(--muted); }
-    .dot.ok { background:var(--accent); box-shadow:0 0 8px var(--accent); animation:blink 2s ease infinite; }
-    .dot.err-dot { background:var(--danger); }
+    /* ════════════════════════════════════════════
+       RIGHT PANEL — PIPELINE
+    ════════════════════════════════════════════ */
+    .right-panel { display: flex; flex-direction: column; gap: 16px; }
 
-    /* ── Animations ── */
-    @keyframes fadeDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)}  to{opacity:1;transform:translateY(0)} }
-    @keyframes popIn    { from{opacity:0;transform:scale(.4)} to{opacity:1;transform:scale(1)} }
-    @keyframes shimmer  { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
-    @keyframes blink    { 0%,100%{opacity:1} 50%{opacity:.3} }
-    @keyframes spin     { to{transform:rotate(360deg)} }
+    /* empty state */
+    .empty-state {
+      background: var(--ink-2); border: 1px dashed var(--line);
+      border-radius: var(--r-xl); padding: 60px 40px; text-align: center;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+    .empty-title { font-family: var(--fd); font-size: 18px; font-weight: 600; color: var(--snow); margin-bottom: 8px; }
+    .empty-desc { font-size: 13px; color: var(--mist); line-height: 1.7; max-width: 300px; margin: 0 auto; }
 
-    @media(max-width:560px){
-      .wrap{padding:36px 14px 72px;}
-      .card{padding:22px;}
-      .result-digit{font-size:64px;}
-      .steps-grid{grid-template-columns:1fr 1fr;}
+    /* pipeline card */
+    .pipe-card {
+      background: var(--ink-2); border: 1px solid var(--line);
+      border-radius: var(--r-xl); overflow: hidden;
+      display: none;
+    }
+    .pipe-card.show { display: block; animation: fadeUp .4s ease both; }
+    .pipe-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px; border-bottom: 1px solid var(--line);
+    }
+    .pipe-card-title { font-family: var(--fd); font-size: 16px; font-weight: 600; }
+    .pipe-card-sub { font-size: 11px; color: var(--mist); margin-top: 2px; font-family: var(--fm); }
+    .pipe-progress {
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--fm); font-size: 11px; color: var(--mist);
+    }
+    .prog-bar {
+      width: 80px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden;
+    }
+    .prog-fill {
+      height: 100%; background: var(--lime); border-radius: 2px; width: 0;
+      transition: width .4s ease;
+    }
+
+    /* steps list */
+    .steps-list { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .step-row {
+      display: grid; grid-template-columns: 36px 1fr 120px; gap: 14px;
+      align-items: start;
+      background: var(--ink-3); border: 1px solid var(--line);
+      border-radius: var(--r-md); padding: 16px;
+      opacity: 0; transform: translateX(-8px);
+      transition: opacity .35s ease, transform .35s ease, border-color .3s ease;
+    }
+    .step-row.active { opacity: 1; transform: translateX(0); }
+    .step-row.done { border-color: rgba(184,255,87,.2); }
+
+    .step-idx {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      background: var(--ink-4); border: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: .3s;
+    }
+    .step-row.done .step-idx { background: var(--lime-dim); border-color: rgba(184,255,87,.3); }
+
+    .step-body { }
+    .step-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .step-name { font-size: 13px; font-weight: 600; color: var(--white); }
+    .step-badge {
+      font-family: var(--fm); font-size: 9px; letter-spacing: 1px;
+      background: var(--line); color: var(--mist);
+      padding: 2px 7px; border-radius: 4px; text-transform: uppercase;
+      transition: .3s;
+    }
+    .step-row.done .step-badge { background: var(--lime-dim); color: var(--lime); }
+    .step-desc-txt { font-size: 11px; color: var(--mist); line-height: 1.6; margin-bottom: 10px; }
+    .step-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .tag {
+      font-family: var(--fm); font-size: 9px; color: var(--mist);
+      background: var(--ink-4); border: 1px solid var(--line);
+      padding: 2px 7px; border-radius: 4px;
+    }
+
+    /* canvas col */
+    .step-canvas-col { }
+    .step-canvas-wrap {
+      background: var(--ink); border: 1px solid var(--line);
+      border-radius: var(--r-sm); overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 72px; aspect-ratio: 4/3;
+    }
+    .step-canvas-wrap canvas { max-width: 100%; height: auto; display: block; image-rendering: pixelated; }
+    .cv-ph { font-size: 10px; color: var(--mist); text-align: center; padding: 16px; font-family: var(--fm); }
+    .step-cv-label { font-size: 9px; color: var(--mist); text-align: center; margin-top: 5px; font-family: var(--fm); letter-spacing: 1px; text-transform: uppercase; }
+
+    /* HOG double canvas */
+    .hog-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .hog-item { }
+
+    /* SVM decision viz */
+    .svm-classes {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 12px;
+    }
+    .cls-chip {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--fd); font-size: 14px; font-weight: 700;
+      background: var(--ink-4); color: var(--mist); border: 1px solid var(--line);
+      transition: .3s;
+    }
+    .cls-chip.winner {
+      background: var(--lime); color: #000; border-color: var(--lime);
+      box-shadow: 0 0 20px var(--lime-glow);
+      transform: scale(1.12);
+    }
+
+    /* ════════════════════════════════════════════
+       RESULT CARD
+    ════════════════════════════════════════════ */
+    .result-banner {
+      background: linear-gradient(135deg, var(--ink-2), var(--ink-3));
+      border: 1px solid rgba(184,255,87,.25);
+      border-radius: var(--r-xl); overflow: hidden;
+      display: none; position: relative;
+    }
+    .result-banner.show { display: block; animation: fadeUp .4s ease both; }
+    .result-banner::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--lime), transparent);
+    }
+
+    .result-inner {
+      display: grid; grid-template-columns: auto 1fr; gap: 28px;
+      align-items: center; padding: 32px;
+    }
+    .result-digit-wrap {
+      width: 100px; height: 100px; border-radius: 20px;
+      background: var(--lime-dim); border: 1px solid rgba(184,255,87,.3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .result-digit {
+      font-family: var(--fd); font-size: 64px; font-weight: 700;
+      color: var(--lime); line-height: 1;
+      animation: popIn .5s cubic-bezier(.175,.885,.32,1.275) both;
+    }
+    .result-label { font-size: 11px; color: var(--mist); font-family: var(--fm); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+    .result-heading { font-family: var(--fd); font-size: 22px; font-weight: 700; margin-bottom: 16px; }
+    .conf-track { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+    .conf-bar { height: 100%; border-radius: 3px; width: 0; transition: width .8s cubic-bezier(.4,0,.2,1); background: linear-gradient(90deg, var(--lime), var(--cyan)); }
+    .conf-meta { font-size: 11px; color: var(--mist); font-family: var(--fm); }
+
+    .result-chips {
+      display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 32px 32px;
+      border-top: 1px solid var(--line);
+    }
+    .r-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--ink-3); border: 1px solid var(--line);
+      border-radius: 8px; padding: 7px 12px; font-size: 11px;
+    }
+    .r-chip-label { color: var(--mist); }
+    .r-chip-val { color: var(--white); font-weight: 600; margin-left: 2px; font-family: var(--fm); }
+
+    /* ════════════════════════════════════════════
+       FOOTER
+    ════════════════════════════════════════════ */
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 28px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; color: var(--mist); font-family: var(--fm);
+    }
+    .foot-logo { font-family: var(--fd); font-weight: 700; color: var(--snow); font-size: 14px; }
+    .foot-links { display: flex; gap: 20px; }
+    .foot-links a { color: var(--mist); text-decoration: none; transition: color .2s; font-size: 11px; letter-spacing: 1px; }
+    .foot-links a:hover { color: var(--lime); }
+
+    /* ════════════════════════════════════════════
+       ANIMATIONS
+    ════════════════════════════════════════════ */
+    @keyframes fadeDown  { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeUp    { from{opacity:0;transform:translateY(16px)}  to{opacity:1;transform:translateY(0)} }
+    @keyframes popIn     { from{opacity:0;transform:scale(.5)} to{opacity:1;transform:scale(1)} }
+    @keyframes shimmer   { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes ripple    { 0%,100%{opacity:.6} 50%{opacity:.2} }
+
+    /* stagger hero */
+    .hero-eyebrow { animation: fadeDown .5s .1s ease both; }
+    h1            { animation: fadeDown .5s .2s ease both; }
+    .hero-desc    { animation: fadeDown .5s .3s ease both; }
+    .hero-stats   { animation: fadeDown .5s .4s ease both; }
+    .pipe-chip:nth-child(1){ animation: fadeUp .4s .3s ease both; }
+    .pipe-chip:nth-child(2){ animation: fadeUp .4s .4s ease both; }
+    .pipe-chip:nth-child(3){ animation: fadeUp .4s .5s ease both; }
+    .pipe-chip:nth-child(4){ animation: fadeUp .4s .6s ease both; }
+    .pipe-chip:nth-child(5){ animation: fadeUp .4s .7s ease both; }
+    .pipe-chip:nth-child(6){ animation: fadeUp .4s .8s ease both; }
+
+    /* ════════════════════════════════════════════
+       RESPONSIVE
+    ════════════════════════════════════════════ */
+    @media(max-width:900px){
+      .hero { grid-template-columns:1fr; gap:40px; padding:48px 24px 40px; }
+      .hero-right { display:none; }
+      .main { grid-template-columns:1fr; padding:0 20px 80px; }
+      nav { padding:16px 20px; }
+      .nav-pills { display:none; }
+      footer { flex-direction:column; gap:16px; text-align:center; padding:24px 20px; }
+      .step-row { grid-template-columns:36px 1fr; }
+      .step-canvas-col { display:none; }
+    }
+    @media(max-width:480px){
+      h1 { font-size:2.2rem; }
+      .result-inner { grid-template-columns:1fr; text-align:center; }
+      .result-digit-wrap { margin:0 auto; }
     }
   </style>
 </head>
 <body>
-<div class="wrap">
 
-  <!-- Header -->
-  <div class="header">
-    <div class="badge"><span class="badge-dot"></span>SVM · Image Processing · Live</div>
-    <h1>Pengenal<br/>Karakter</h1>
-    <p class="subtitle">Upload gambar karakter angka (0–9) atau huruf X. Lihat setiap tahap image processing secara real-time sebelum model SVM memprediksi hasilnya.</p>
-  </div>
+<!-- Ambient blobs -->
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
 
-  <!-- Config -->
-  <div class="card" style="animation:fadeUp .5s .1s ease both">
-    <div class="card-title">Konfigurasi API</div>
-    <div class="input-row">
-      <input class="inp" id="apiUrl" type="text"
-        placeholder="https://username-spacename.hf.space"
-        value="https://martinmachine-penilaian-informatika.hf.space" />
+<div class="page">
+
+  <!-- ── NAV ── -->
+  <nav>
+    <a href="#" class="nav-logo">
+      CharScan
+      <span class="logo-badge">Beta</span>
+    </a>
+    <div class="nav-pills">
+      <span class="nav-pill active">Demo</span>
+      <span class="nav-pill">Dokumentasi</span>
+      <span class="nav-pill">API</span>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:10px">URL Hugging Face Space backend Anda</p>
-  </div>
-
-  <!-- Upload -->
-  <div class="card" style="animation:fadeUp .5s .2s ease both">
-    <div class="card-title">Upload Gambar</div>
-
-    <div class="drop" id="drop">
-      <span class="drop-icon">🖼️</span>
-      <div class="drop-title">Seret & lepas gambar di sini</div>
-      <div class="drop-hint">atau <span onclick="document.getElementById('fi').click()">pilih file</span> — JPG / PNG</div>
-      <input type="file" id="fi" accept="image/jpeg,image/png" />
+    <div class="status-pill">
+      <div class="s-dot" id="sDot"></div>
+      <span id="sTxt">Menghubungkan…</span>
     </div>
+  </nav>
 
-    <div class="prev-bar" id="prevBar">
-      <img id="prevImg" alt="preview" />
-      <div class="prev-info">
-        <div class="prev-name" id="prevName">—</div>
-        <div class="prev-size" id="prevSize">—</div>
-      </div>
-      <button class="btn-clear" onclick="clearFile()">Hapus</button>
-    </div>
-
-    <button class="btn-pred" id="btnPred" disabled onclick="runPipeline()">
-      Jalankan Pipeline &amp; Prediksi
-    </button>
-    <div class="err" id="errBox"></div>
-  </div>
-
-  <!-- ── Pipeline Visualization ── -->
-  <div class="pipeline-section" id="pipelineSection">
-    <div class="pipeline-header">
-      <div>
-        <div class="pipeline-title">🔬 Pipeline Image Processing</div>
-        <div class="pipeline-subtitle">Setiap tahap diproses secara real-time di browser menggunakan Canvas API</div>
-      </div>
-    </div>
-
-    <div class="steps-grid" id="stepsGrid">
-
-      <!-- Step 1: Original -->
-      <div class="step-card" id="step0">
-        <div class="step-num">1</div>
-        <span class="step-icon">🖼️</span>
-        <div class="step-name">Original</div>
-        <div class="step-desc">Gambar asli yang diupload oleh pengguna sebelum diproses apapun.</div>
-        <div class="canvas-wrap"><div class="canvas-placeholder">Menunggu…</div></div>
-        <div class="step-meta">
-          <span class="meta-tag" id="s0-size">—</span>
-          <span class="meta-tag" id="s0-type">—</span>
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow">SVM · Image Processing · Real-time</div>
+      <h1>Kenali <em>Karakter</em><br/>dengan Presisi AI</h1>
+      <p class="hero-desc">
+        Upload gambar karakter angka (0–9) atau huruf X. Pipeline image processing divisualisasikan secara real-time — dari piksel mentah hingga keputusan model SVM.
+      </p>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-val">11</div>
+          <div class="stat-label">Kelas Karakter</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">6</div>
+          <div class="stat-label">Tahap Pipeline</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">93%+</div>
+          <div class="stat-label">Akurasi Model</div>
         </div>
       </div>
+    </div>
+    <div class="hero-right">
+      <div class="pipe-chip"><div class="pipe-chip-num">01</div><div class="pipe-chip-text"><div class="pipe-chip-name">Upload Gambar</div><div class="pipe-chip-desc">JPG / PNG karakter tunggal</div></div><div class="pipe-chip-arrow">→</div></div>
+      <div class="pipe-chip"><div class="pipe-chip-num">02</div><div class="pipe-chip-text"><div class="pipe-chip-name">Resize 21×15px</div><div class="pipe-chip-desc">Normalisasi dimensi input</div></div><div class="pipe-chip-arrow">→</div></div>
+      <div class="pipe-chip"><div class="pipe-chip-num">03</div><div class="pipe-chip-text"><div class="pipe-chip-name">Grayscale</div><div class="pipe-chip-desc">Eliminasi informasi warna</div></div><div class="pipe-chip-arrow">→</div></div>
+      <div class="pipe-chip"><div class="pipe-chip-num">04</div><div class="pipe-chip-text"><div class="pipe-chip-name">Otsu Threshold</div><div class="pipe-chip-desc">Binarisasi adaptif</div></div><div class="pipe-chip-arrow">→</div></div>
+      <div class="pipe-chip"><div class="pipe-chip-num">05</div><div class="pipe-chip-text"><div class="pipe-chip-name">HOG Features</div><div class="pipe-chip-desc">Histogram of Oriented Gradients</div></div><div class="pipe-chip-arrow">→</div></div>
+      <div class="pipe-chip"><div class="pipe-chip-num">06</div><div class="pipe-chip-text"><div class="pipe-chip-name">SVM Classifier</div><div class="pipe-chip-desc">Prediksi dengan kernel RBF</div></div><div class="pipe-chip-arrow">→</div></div>
+    </div>
+  </section>
 
-      <!-- Step 2: Resize -->
-      <div class="step-card" id="step1">
-        <div class="step-num">2</div>
-        <span class="step-icon">📐</span>
-        <div class="step-name">Resize</div>
-        <div class="step-desc">Gambar dikecilkan ke ukuran tetap 21×15 piksel agar konsisten sebagai input model.</div>
-        <div class="canvas-wrap"><div class="canvas-placeholder">Menunggu…</div></div>
-        <div class="step-meta">
-          <span class="meta-tag green">21 × 15 px</span>
-          <span class="meta-tag">anti-aliasing</span>
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- LEFT: Input Panel -->
+    <div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Konfigurasi</div>
         </div>
-      </div>
-
-      <!-- Step 3: Grayscale -->
-      <div class="step-card" id="step2">
-        <div class="step-num">3</div>
-        <span class="step-icon">🩶</span>
-        <div class="step-name">Grayscale</div>
-        <div class="step-desc">Konversi RGB → skala abu-abu. Menghilangkan informasi warna yang tidak relevan.</div>
-        <div class="canvas-wrap"><div class="canvas-placeholder">Menunggu…</div></div>
-        <div class="step-meta">
-          <span class="meta-tag green">1 channel</span>
-          <span class="meta-tag">rgb2gray</span>
-        </div>
-      </div>
-
-      <!-- Step 4: Threshold -->
-      <div class="step-card" id="step3">
-        <div class="step-num">4</div>
-        <span class="step-icon">⬛</span>
-        <div class="step-name">Otsu Threshold</div>
-        <div class="step-desc">Binarisasi adaptif — piksel gelap (karakter) jadi putih, latar menjadi hitam.</div>
-        <div class="canvas-wrap"><div class="canvas-placeholder">Menunggu…</div></div>
-        <div class="step-meta">
-          <span class="meta-tag green">biner 0/1</span>
-          <span class="meta-tag" id="s3-thresh">threshold: —</span>
-        </div>
-      </div>
-
-      <!-- Step 5: HOG -->
-      <div class="step-card" id="step4" style="grid-column: span 2;">
-        <div class="step-num">5</div>
-        <span class="step-icon">📊</span>
-        <div class="step-name">HOG Features — Histogram of Oriented Gradients</div>
-        <div class="step-desc">Ekstraksi vektor fitur dari pola tepi dan gradien gambar. Lebih robust dibanding pixel mentah. Vektor inilah yang diumpankan ke model SVM.</div>
-        <div class="hog-wrap">
-          <div>
-            <div class="canvas-wrap" id="hogMagWrap"><div class="canvas-placeholder">Menunggu…</div></div>
-            <div class="hog-label">Gradient Magnitude</div>
+        <div class="panel-body">
+          <div class="field-label">URL Backend API</div>
+          <div class="inp-wrap">
+            <span class="inp-icon">🔗</span>
+            <input class="inp" id="apiUrl" type="text"
+              placeholder="https://username-spacename.hf.space"
+              value="https://martinmachine-penilaian-informatika.hf.space" />
           </div>
-          <div>
-            <div class="canvas-wrap" id="hogDirWrap"><div class="canvas-placeholder">Menunggu…</div></div>
-            <div class="hog-label">Gradient Direction</div>
+          <div class="inp-hint">Hugging Face Space — <span id="apiStatus" style="color:var(--mist)">memeriksa…</span></div>
+
+          <div style="height:14px"></div>
+          <div class="field-label">API Key</div>
+          <div class="inp-wrap">
+            <span class="inp-icon">🔑</span>
+            <input class="inp" id="apiKey" type="password"
+              placeholder="Masukkan API key rahasia Anda"
+              autocomplete="off" />
+          </div>
+          <div class="inp-hint" style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--lime);font-size:10px">🔒</span>
+            Key hanya dikirim ke HF Space Anda — tidak ke server lain
           </div>
         </div>
-        <div class="step-meta" style="margin-top:12px">
-          <span class="meta-tag green" id="s4-feat">— features</span>
-          <span class="meta-tag">8 orientations</span>
-          <span class="meta-tag">3×3 cells</span>
-          <span class="meta-tag">2×2 blocks</span>
+      </div>
+
+      <div style="height:16px"></div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Upload Gambar</div>
+        </div>
+        <div class="panel-body">
+          <div class="drop-zone" id="dz">
+            <div class="dz-icon">📂</div>
+            <div class="dz-title">Seret gambar ke sini</div>
+            <div class="dz-sub">atau <b onclick="document.getElementById('fi').click()">telusuri file</b> dari perangkat Anda</div>
+            <div class="dz-formats">
+              <span class="fmt-tag">JPG</span>
+              <span class="fmt-tag">PNG</span>
+              <span class="fmt-tag">Max 5MB</span>
+            </div>
+            <input type="file" id="fi" accept="image/jpeg,image/png" />
+          </div>
+
+          <div class="prev-bar" id="prevBar">
+            <img id="prevImg" alt="preview" />
+            <div class="prev-info">
+              <div class="prev-name" id="prevName">—</div>
+              <div class="prev-meta" id="prevMeta">—</div>
+            </div>
+            <button class="btn-rm" onclick="clearFile()">✕ Hapus</button>
+          </div>
+
+          <button class="btn-run" id="btnRun" disabled onclick="runPipeline()">
+            <span class="btn-icon">⚡</span>
+            <span id="btnTxt">Jalankan Pipeline & Prediksi</span>
+          </button>
+
+          <div class="err-box" id="errBox">
+            <span class="err-icon">⚠</span>
+            <span class="err-text" id="errTxt"></span>
+          </div>
         </div>
       </div>
 
-      <!-- Step 6: SVM -->
-      <div class="step-card" id="step5" style="grid-column: span 2;">
-        <div class="step-num">6</div>
-        <span class="step-icon">🤖</span>
-        <div class="step-name">SVM Prediction</div>
-        <div class="step-desc">Vektor HOG di-scale dengan StandardScaler lalu diumpankan ke model SVM (kernel RBF). Model menghitung decision boundary dan mengembalikan kelas dengan skor tertinggi.</div>
-        <div class="canvas-wrap" id="svmViz" style="min-height:70px; padding:16px;">
-          <div class="canvas-placeholder">Menunggu hasil prediksi dari server…</div>
+      <!-- Tips -->
+      <div style="margin-top:16px; padding:16px 18px; background:var(--ink-2); border:1px solid var(--line); border-radius:var(--r-md);">
+        <div style="font-size:10px;color:var(--mist);font-family:var(--fm);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Tips Penggunaan</div>
+        <div style="font-size:12px;color:var(--fog);line-height:1.8">
+          ✓ Gunakan gambar dengan latar belakang terang dan karakter gelap<br/>
+          ✓ Satu karakter per gambar untuk hasil terbaik<br/>
+          ✓ Ukuran asli gambar tidak berpengaruh — akan di-resize otomatis
         </div>
-        <div class="step-meta" style="margin-top:12px">
-          <span class="meta-tag">StandardScaler</span>
-          <span class="meta-tag">kernel: RBF</span>
-          <span class="meta-tag green" id="s5-result">prediksi: —</span>
-        </div>
-      </div>
-
-    </div><!-- /steps-grid -->
-  </div><!-- /pipeline-section -->
-
-  <!-- Result -->
-  <div class="card result-card" id="resultCard">
-    <div class="card-title">Hasil Prediksi</div>
-    <div class="result-inner">
-      <div class="result-digit" id="resDigit">—</div>
-      <div class="result-meta">
-        <div class="result-label">Karakter Terdeteksi</div>
-        <div class="result-value" id="resValue">—</div>
-        <div class="conf-bar"><div class="conf-fill" id="confFill"></div></div>
-        <div class="conf-text" id="confText">—</div>
       </div>
     </div>
-    <div class="summary-row" id="summaryRow"></div>
-  </div>
 
-  <!-- Status -->
-  <div class="status-row">
-    <div class="dot" id="statusDot"></div>
-    <span id="statusTxt">Belum terhubung</span>
-  </div>
+    <!-- RIGHT: Pipeline + Result -->
+    <div class="right-panel">
 
-</div><!-- /wrap -->
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🔬</div>
+        <div class="empty-title">Pipeline Siap Dijalankan</div>
+        <div class="empty-desc">Upload gambar dan klik "Jalankan Pipeline" untuk melihat setiap tahap image processing secara real-time.</div>
+      </div>
+
+      <!-- Pipeline card -->
+      <div class="pipe-card" id="pipeCard">
+        <div class="pipe-card-head">
+          <div>
+            <div class="pipe-card-title">🔬 Image Processing Pipeline</div>
+            <div class="pipe-card-sub" id="pipeSubtitle">Memproses gambar…</div>
+          </div>
+          <div class="pipe-progress">
+            <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+            <span id="progTxt">0/6</span>
+          </div>
+        </div>
+        <div class="steps-list" id="stepsList">
+
+          <!-- Step 0 -->
+          <div class="step-row" id="sr0">
+            <div class="step-idx">🖼️</div>
+            <div class="step-body">
+              <div class="step-name-row">
+                <span class="step-name">Original</span>
+                <span class="step-badge" id="b0">pending</span>
+              </div>
+              <div class="step-desc-txt">Gambar asli sebelum diproses — ditampilkan apa adanya.</div>
+              <div class="step-tags">
+                <span class="tag" id="t0-size">—</span>
+                <span class="tag" id="t0-fmt">—</span>
+              </div>
+            </div>
+            <div class="step-canvas-col">
+              <div class="step-canvas-wrap" id="cw0"><div class="cv-ph">—</div></div>
+              <div class="step-cv-label">Original</div>
+            </div>
+          </div>
+
+          <!-- Step 1 -->
+          <div class="step-row" id="sr1">
+            <div class="step-idx">📐</div>
+            <div class="step-body">
+              <div class="step-name-row">
+                <span class="step-name">Resize</span>
+                <span class="step-badge" id="b1">pending</span>
+              </div>
+              <div class="step-desc-txt">Gambar dikecilkan ke 21×15 px — ukuran standar input model.</div>
+              <div class="step-tags">
+                <span class="tag">21 × 15 px</span>
+                <span class="tag">anti-aliasing</span>
+                <span class="tag">bilinear</span>
+              </div>
+            </div>
+            <div class="step-canvas-col">
+              <div class="step-canvas-wrap" id="cw1"><div class="cv-ph">—</div></div>
+              <div class="step-cv-label">Resized ×8</div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-row" id="sr2">
+            <div class="step-idx">🩶</div>
+            <div class="step-body">
+              <div class="step-name-row">
+                <span class="step-name">Grayscale</span>
+                <span class="step-badge" id="b2">pending</span>
+              </div>
+              <div class="step-desc-txt">Konversi RGB → 1 channel abu-abu menggunakan luminance weighting.</div>
+              <div class="step-tags">
+                <span class="tag">rgb2gray</span>
+                <span class="tag">1 channel</span>
+                <span class="tag">float [0,1]</span>
+              </div>
+            </div>
+            <div class="step-canvas-col">
+              <div class="step-canvas-wrap" id="cw2"><div class="cv-ph">—</div></div>
+              <div class="step-cv-label">Grayscale</div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-row" id="sr3">
+            <div class="step-idx">⬛</div>
+            <div class="step-body">
+              <div class="step-name-row">
+                <span class="step-name">Otsu Threshold</span>
+                <span class="step-badge" id="b3">pending</span>
+              </div>
+              <div class="step-desc-txt">Binarisasi otomatis — threshold dihitung dari histogram piksel.</div>
+              <div class="step-tags">
+                <span class="tag">biner 0/1</span>
+                <span class="tag" id="t3-thresh">threshold: —</span>
+              </div>
+            </div>
+            <div class="step-canvas-col">
+              <div class="step-canvas-wrap" id="cw3"><div class="cv-ph">—</div></div>
+              <div class="step-cv-label">Binary</div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="step-row" id="sr4">
+            <div class="step-idx">📊</div>
+            <div class="step-body">
+              <div class="step-name-row">
+                <span class="step-name">HOG Features</span>
+                <span class="step-badge" id="b4">pending</span>
+              </div>
+              <div class="step-desc-txt">Histogram of Oriented Gradients — vektor fitur yang diumpankan ke SVM.</div>
+              <div class="step-tags">
+                <span class="tag">8 orientations</span>
+                <span class="tag">3×3 cells</span>
+                <span class="tag" id="t4-feat">— features</span>
+              </div>
+            </div>
+            <div class="step-canvas-col">
+              <div class="hog-row">
+                <div class="hog-item">
+                  <div class="step-canvas-wrap" id="cw4a"><div class="cv-ph">—</div></div>
+                  <div class="step-cv-label">Magnitude</div>
+                </div>
+                <div class="hog-item">
+                  <div class="step-canvas-wrap" id="cw4b"><div class="cv-ph">—</div></div>
+                  <div class="step-cv-label">Direction</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="step-row" id="sr5">
+            <div class="step-idx">🤖</div>
+            <div class="step-body">
+              <div class="step-name-row">
+                <span class="step-name">SVM Classifier</span>
+                <span class="step-badge" id="b5">pending</span>
+              </div>
+              <div class="step-desc-txt">StandardScaler + SVM RBF — model memilih kelas dengan decision score tertinggi.</div>
+              <div class="step-tags">
+                <span class="tag">StandardScaler</span>
+                <span class="tag">kernel: RBF</span>
+                <span class="tag" id="t5-res">prediksi: —</span>
+              </div>
+              <div class="svm-classes" id="svmClasses" style="display:none;margin-top:10px;padding:0"></div>
+            </div>
+            <div class="step-canvas-col" style="display:flex;align-items:center;justify-content:center">
+              <div id="svmResult" style="font-family:var(--fh);font-size:40px;font-weight:700;color:var(--lime);display:none;text-shadow:0 0 30px var(--lime-glow)">—</div>
+            </div>
+          </div>
+
+        </div><!-- /steps-list -->
+      </div><!-- /pipe-card -->
+
+      <!-- Result Banner -->
+      <div class="result-banner" id="resultBanner">
+        <div class="result-inner">
+          <div class="result-digit-wrap">
+            <div class="result-digit" id="resDigit">—</div>
+          </div>
+          <div>
+            <div class="result-label">Karakter Terdeteksi</div>
+            <div class="result-heading" id="resHeading">—</div>
+            <div class="conf-track"><div class="conf-bar" id="confBar"></div></div>
+            <div class="conf-meta" id="confMeta">—</div>
+          </div>
+        </div>
+        <div class="result-chips" id="resultChips"></div>
+      </div>
+
+    </div><!-- /right-panel -->
+  </main>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="foot-logo">CharScan</div>
+    <div style="font-size:11px">Pipeline: Resize → Grayscale → Otsu → HOG → SVM · Backend: Hugging Face Spaces · Frontend: Vercel</div>
+    <div class="foot-links">
+      <a href="#">GitHub</a>
+      <a href="#">API Docs</a>
+      <a href="#">Tentang</a>
+    </div>
+  </footer>
+
+</div><!-- /page -->
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
-let selectedFile = null;
-let imgElement   = null;   // HTMLImageElement dari file upload
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let selFile = null, imgEl = null;
+const W = 21, H = 15;
 
-// ── File Handling ──────────────────────────────────────────────────────────
-const fi   = document.getElementById('fi');
-const drop = document.getElementById('drop');
+// ════════════════════════════════════════════
+// FILE HANDLING
+// ════════════════════════════════════════════
+const fi = document.getElementById('fi');
+const dz = document.getElementById('dz');
 
 fi.addEventListener('change', e => { if(e.target.files[0]) setFile(e.target.files[0]); });
-drop.addEventListener('click', () => fi.click());
-drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
-drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-drop.addEventListener('drop', e => {
-  e.preventDefault(); drop.classList.remove('over');
+dz.addEventListener('click', () => fi.click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
   const f = e.dataTransfer.files[0];
   if(f && f.type.startsWith('image/')) setFile(f);
 });
 
 function setFile(file) {
-  selectedFile = file;
+  selFile = file;
   const reader = new FileReader();
   reader.onload = ev => {
     document.getElementById('prevImg').src = ev.target.result;
-    // preload image element for canvas
-    imgElement = new Image();
-    imgElement.onload = () => {};
-    imgElement.src = ev.target.result;
+    imgEl = new Image();
+    imgEl.src = ev.target.result;
   };
   reader.readAsDataURL(file);
   document.getElementById('prevName').textContent = file.name;
-  document.getElementById('prevSize').textContent = (file.size/1024).toFixed(1)+' KB';
+  document.getElementById('prevMeta').textContent =
+    `${(file.size/1024).toFixed(1)} KB · ${file.type.split('/')[1].toUpperCase()}`;
   document.getElementById('prevBar').classList.add('show');
-  document.getElementById('btnPred').disabled = false;
-  hideErr(); hideResult(); hidePipeline();
+  document.getElementById('btnRun').disabled = false;
+  hideErr(); hideResult(); resetPipeline();
 }
 
 function clearFile() {
-  selectedFile = null; imgElement = null; fi.value='';
+  selFile = null; imgEl = null; fi.value = '';
   document.getElementById('prevBar').classList.remove('show');
-  document.getElementById('btnPred').disabled = true;
-  hideErr(); hideResult(); hidePipeline();
+  document.getElementById('btnRun').disabled = true;
+  hideErr(); hideResult(); resetPipeline();
 }
 
-// ── Pipeline Runner ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════
+// PIPELINE
+// ════════════════════════════════════════════
 async function runPipeline() {
-  if(!selectedFile) return;
+  if(!selFile) return;
   const apiBase = document.getElementById('apiUrl').value.trim().replace(/\/$/,'');
   if(!apiBase){ showErr('Masukkan URL API terlebih dahulu.'); return; }
+  const apiKey = document.getElementById('apiKey') ? document.getElementById('apiKey').value.trim() : '';
 
-  // UI loading
-  const btn = document.getElementById('btnPred');
-  btn.disabled=true; btn.classList.add('loading'); btn.textContent='Memproses…';
+  const btn = document.getElementById('btnRun');
+  const txt = document.getElementById('btnTxt');
+  btn.disabled = true; btn.classList.add('loading');
+  txt.textContent = 'Memproses…';
   hideErr(); hideResult();
 
-  // Show pipeline section
-  showPipeline();
+  // show pipeline
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('pipeCard').classList.add('show');
+  resetStepRows();
 
   try {
-    // ── STEP 1: Original ──────────────────────────────────────────────
-    await activateStep(0);
+    // STEP 0 — Original
+    await activate(0); setProg(1);
     await drawOriginal();
-    doneStep(0);
+    done(0);
 
-    // ── STEP 2: Resize ────────────────────────────────────────────────
-    await activateStep(1);
-    const resizedData = await drawResized();
-    doneStep(1);
+    // STEP 1 — Resize
+    await activate(1); setProg(2);
+    const rData = await drawResized();
+    done(1);
 
-    // ── STEP 3: Grayscale ─────────────────────────────────────────────
-    await activateStep(2);
-    const grayData = await drawGrayscale(resizedData);
-    doneStep(2);
+    // STEP 2 — Grayscale
+    await activate(2); setProg(3);
+    const gData = await drawGray(rData);
+    done(2);
 
-    // ── STEP 4: Threshold ─────────────────────────────────────────────
-    await activateStep(3);
-    const binData = await drawThreshold(grayData);
-    doneStep(3);
+    // STEP 3 — Threshold
+    await activate(3); setProg(4);
+    const bData = await drawThresh(gData);
+    done(3);
 
-    // ── STEP 5: HOG ───────────────────────────────────────────────────
-    await activateStep(4);
-    await drawHOG(binData);
-    doneStep(4);
+    // STEP 4 — HOG
+    await activate(4); setProg(5);
+    await drawHOG(bData);
+    done(4);
 
-    // ── STEP 6: SVM Predict (API call) ────────────────────────────────
-    await activateStep(5);
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    const res  = await fetch(`${apiBase}/predict`, { method:'POST', body:formData });
+    // STEP 5 — SVM
+    await activate(5); setProg(6);
+    document.getElementById('pipeSubtitle').textContent = 'Mengirim ke server…';
+    const apiKey = document.getElementById('apiKey').value.trim();
+    if(!apiKey){ showErr('Masukkan API key terlebih dahulu.'); throw new Error('API key kosong'); }
+    const fd = new FormData(); fd.append('file', selFile);
+    const res = await fetch(`${apiBase}/predict`,{
+      method:'POST', body:fd,
+      headers:{ 'X-API-Key': apiKey }
+    });
     if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.detail||`HTTP ${res.status}`); }
     const data = await res.json();
+    showSVMResult(data);
+    done(5);
 
-    // show SVM result in step card
-    document.getElementById('svmViz').innerHTML = buildSVMViz(data);
-    document.getElementById('s5-result').textContent = `prediksi: "${data.predicted_label}"`;
-    doneStep(5);
-
-    // ── Final Result ──────────────────────────────────────────────────
+    document.getElementById('pipeSubtitle').textContent = 'Pipeline selesai ✓';
     showResult(data);
-    setStatus('ok', `Terhubung · ${apiBase}`);
+    setStatus('live', 'API Terhubung');
 
   } catch(err) {
-    showErr(`Error: ${err.message}`);
-    setStatus('err-dot','Koneksi gagal');
+    showErr(`Gagal: ${err.message}`);
+    setStatus('err','Koneksi gagal');
   } finally {
     btn.disabled=false; btn.classList.remove('loading');
-    btn.textContent='Jalankan Pipeline & Prediksi';
+    txt.textContent='Jalankan Pipeline & Prediksi';
   }
 }
 
-// ── Canvas Helpers ─────────────────────────────────────────────────────────
-const W = 21, H = 15;   // target resize
+// ════════════════════════════════════════════
+// CANVAS DRAWING
+// ════════════════════════════════════════════
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-function getStepCanvas(stepId, wrapSel) {
-  const wrap = wrapSel
-    ? document.querySelector(wrapSel)
-    : document.querySelector(`#${stepId} .canvas-wrap`);
-  wrap.innerHTML = '';
+function makeCanvas(wrapId, cw, ch, scale=1){
+  const wrap = document.getElementById(wrapId);
+  wrap.innerHTML='';
   const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
   wrap.appendChild(c);
   return c;
 }
 
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-// Step 1 — Original
 async function drawOriginal(){
   await sleep(80);
-  const c   = getStepCanvas('step0');
-  const nat = imgElement.naturalWidth, naH = imgElement.naturalHeight;
-  const scale = Math.min(160/nat, 120/naH, 1);
-  c.width  = Math.round(nat*scale);
-  c.height = Math.round(naH*scale);
-  c.getContext('2d').drawImage(imgElement, 0, 0, c.width, c.height);
-  document.getElementById('s0-size').textContent = `${nat} × ${naH} px`;
-  document.getElementById('s0-type').textContent = selectedFile.type.split('/')[1].toUpperCase();
+  const nw=imgEl.naturalWidth, nh=imgEl.naturalHeight;
+  const S = Math.min(200/nw, 150/nh, 2);
+  const c = makeCanvas('cw0', Math.round(nw*S), Math.round(nh*S));
+  c.getContext('2d').drawImage(imgEl,0,0,c.width,c.height);
+  document.getElementById('t0-size').textContent = `${nw}×${nh}px`;
+  document.getElementById('t0-fmt').textContent = selFile.type.split('/')[1].toUpperCase();
+  document.getElementById('b0').textContent = 'done';
 }
 
-// Step 2 — Resize to 21×15
 async function drawResized(){
-  await sleep(120);
-  // offscreen canvas at 21×15
-  const off = document.createElement('canvas');
-  off.width=W; off.height=H;
-  const ctx = off.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(imgElement, 0, 0, W, H);
-
-  // display scaled up ×8
-  const S = 8;
-  const c = getStepCanvas('step1');
-  c.width=W*S; c.height=H*S;
-  const dCtx = c.getContext('2d');
-  dCtx.imageSmoothingEnabled = false;
-  dCtx.drawImage(off, 0, 0, W*S, H*S);
-
-  return ctx.getImageData(0,0,W,H);
+  await sleep(100);
+  const off=document.createElement('canvas'); off.width=W; off.height=H;
+  const oc=off.getContext('2d'); oc.imageSmoothingEnabled=true; oc.imageSmoothingQuality='high';
+  oc.drawImage(imgEl,0,0,W,H);
+  const S=8;
+  const c=makeCanvas('cw1',W*S,H*S);
+  const cx=c.getContext('2d'); cx.imageSmoothingEnabled=false;
+  cx.drawImage(off,0,0,W*S,H*S);
+  document.getElementById('b1').textContent='done';
+  return oc.getImageData(0,0,W,H);
 }
 
-// Step 3 — Grayscale
-async function drawGrayscale(imgData){
-  await sleep(120);
-  const S=8;
-  const c = getStepCanvas('step2');
-  c.width=W*S; c.height=H*S;
-  const ctx = c.getContext('2d');
-
-  // compute gray
-  const gray = new Float32Array(W*H);
-  const d = imgData.data;
+async function drawGray(imgData){
+  await sleep(100);
+  const gray=new Float32Array(W*H);
+  const d=imgData.data;
   for(let i=0;i<W*H;i++){
-    const r=d[i*4]/255, g=d[i*4+1]/255, b=d[i*4+2]/255;
-    gray[i] = 0.2125*r + 0.7154*g + 0.0721*b;
+    gray[i]=0.2125*(d[i*4]/255)+0.7154*(d[i*4+1]/255)+0.0721*(d[i*4+2]/255);
   }
-
-  // draw scaled
-  const tmp = document.createElement('canvas'); tmp.width=W; tmp.height=H;
-  const tCtx=tmp.getContext('2d');
-  const tImg=tCtx.createImageData(W,H);
+  const S=8, c=makeCanvas('cw2',W*S,H*S);
+  const tmp=document.createElement('canvas'); tmp.width=W; tmp.height=H;
+  const tc=tmp.getContext('2d'), ti=tc.createImageData(W,H);
   for(let i=0;i<W*H;i++){
     const v=Math.round(gray[i]*255);
-    tImg.data[i*4]=tImg.data[i*4+1]=tImg.data[i*4+2]=v; tImg.data[i*4+3]=255;
+    ti.data[i*4]=ti.data[i*4+1]=ti.data[i*4+2]=v; ti.data[i*4+3]=255;
   }
-  tCtx.putImageData(tImg,0,0);
-  ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(tmp,0,0,W*S,H*S);
-
+  tc.putImageData(ti,0,0);
+  const cx=c.getContext('2d'); cx.imageSmoothingEnabled=false;
+  cx.drawImage(tmp,0,0,W*S,H*S);
+  document.getElementById('b2').textContent='done';
   return gray;
 }
 
-// Step 4 — Otsu Threshold
-async function drawThreshold(gray){
-  await sleep(120);
-  // compute Otsu threshold
-  const hist = new Array(256).fill(0);
+async function drawThresh(gray){
+  await sleep(100);
+  // Otsu
+  const hist=new Array(256).fill(0);
   gray.forEach(v=>hist[Math.min(255,Math.floor(v*255))]++);
-  const total=W*H;
-  let sum=0; for(let i=0;i<256;i++) sum+=i*hist[i];
-  let sumB=0, wB=0, wF=0, max=0, thresh=0;
+  const total=W*H; let sum=0;
+  for(let i=0;i<256;i++) sum+=i*hist[i];
+  let sumB=0,wB=0,max=0,thresh=0;
   for(let t=0;t<256;t++){
     wB+=hist[t]; if(!wB) continue;
-    wF=total-wB; if(!wF) break;
+    const wF=total-wB; if(!wF) break;
     sumB+=t*hist[t];
     const mB=sumB/wB, mF=(sum-sumB)/wF;
-    const between=wB*wF*(mB-mF)*(mB-mF);
-    if(between>max){ max=between; thresh=t; }
+    const bw=wB*wF*(mB-mF)*(mB-mF);
+    if(bw>max){max=bw;thresh=t;}
   }
-  const tNorm=thresh/255;
-  document.getElementById('s3-thresh').textContent=`threshold: ${thresh}`;
+  const tN=thresh/255;
+  document.getElementById('t3-thresh').textContent=`threshold: ${thresh}`;
 
-  const S=8;
-  const c=getStepCanvas('step3');
-  c.width=W*S; c.height=H*S;
-  const ctx=c.getContext('2d');
-
-  const bin=new Uint8Array(W*H);
+  const S=8, bin=new Uint8Array(W*H);
   const tmp=document.createElement('canvas'); tmp.width=W; tmp.height=H;
-  const tCtx=tmp.getContext('2d');
-  const tImg=tCtx.createImageData(W,H);
+  const tc=tmp.getContext('2d'), ti=tc.createImageData(W,H);
   for(let i=0;i<W*H;i++){
-    const isChar = gray[i] < tNorm;   // dark pixel = character
-    bin[i]=isChar?1:0;
-    const v=isChar?255:0;
-    tImg.data[i*4]=tImg.data[i*4+1]=tImg.data[i*4+2]=v; tImg.data[i*4+3]=255;
+    bin[i]=gray[i]<tN?1:0;
+    const v=bin[i]?255:0;
+    ti.data[i*4]=ti.data[i*4+1]=ti.data[i*4+2]=v; ti.data[i*4+3]=255;
   }
-  tCtx.putImageData(tImg,0,0);
-  ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(tmp,0,0,W*S,H*S);
-
-  return {bin, tNorm};
+  tc.putImageData(ti,0,0);
+  const c=makeCanvas('cw3',W*S,H*S);
+  const cx=c.getContext('2d'); cx.imageSmoothingEnabled=false;
+  cx.drawImage(tmp,0,0,W*S,H*S);
+  document.getElementById('b3').textContent='done';
+  return {bin,tN};
 }
 
-// Step 5 — HOG visualization
 async function drawHOG({bin}){
-  await sleep(150);
-  // compute simple gradient magnitude + direction for visualization
+  await sleep(120);
   const S=6;
-  const magC = getStepCanvas('step4','#hogMagWrap');
-  const dirC = getStepCanvas('step4','#hogDirWrap');
-  magC.width=W*S; magC.height=H*S;
-  dirC.width=W*S; dirC.height=H*S;
+  const mag=new Float32Array(W*H), dir=new Float32Array(W*H);
+  for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+    const gx=bin[y*W+(x+1)]-bin[y*W+(x-1)];
+    const gy=bin[(y+1)*W+x]-bin[(y-1)*W+x];
+    mag[y*W+x]=Math.sqrt(gx*gx+gy*gy);
+    dir[y*W+x]=(Math.atan2(gy,gx)+Math.PI)/(2*Math.PI);
+  }
+  const maxM=Math.max(...mag)+1e-9;
 
-  const mCtx=magC.getContext('2d'); const dCtx=dirC.getContext('2d');
-
-  const mag=new Float32Array(W*H);
-  const dir=new Float32Array(W*H);
-
-  for(let y=1;y<H-1;y++){
-    for(let x=1;x<W-1;x++){
-      const gx=bin[y*W+(x+1)]-bin[y*W+(x-1)];
-      const gy=bin[(y+1)*W+x]-bin[(y-1)*W+x];
-      mag[y*W+x]=Math.sqrt(gx*gx+gy*gy);
-      dir[y*W+x]=(Math.atan2(gy,gx)+Math.PI)/(2*Math.PI); // 0-1
+  const makeHOGCanvas=(id,colorFn)=>{
+    const tmp=document.createElement('canvas'); tmp.width=W; tmp.height=H;
+    const tc=tmp.getContext('2d'), ti=tc.createImageData(W,H);
+    for(let i=0;i<W*H;i++){
+      const [r,g,b]=colorFn(i);
+      ti.data[i*4]=r; ti.data[i*4+1]=g; ti.data[i*4+2]=b; ti.data[i*4+3]=255;
     }
-  }
+    tc.putImageData(ti,0,0);
+    const c=makeCanvas(id,W*S,H*S);
+    const cx=c.getContext('2d'); cx.imageSmoothingEnabled=false;
+    cx.drawImage(tmp,0,0,W*S,H*S);
+  };
 
-  const maxMag=Math.max(...mag)+1e-9;
+  makeHOGCanvas('cw4a', i=>{
+    const m=Math.round((mag[i]/maxM)*255);
+    return [0, m, Math.round(m*.5)];
+  });
+  makeHOGCanvas('cw4b', i=>{
+    return hsl(dir[i]*360,.9,.55);
+  });
 
-  const mImg=mCtx.createImageData(W,H);
-  const dImg=dCtx.createImageData(W,H);
-
-  for(let i=0;i<W*H;i++){
-    const m=Math.round((mag[i]/maxMag)*255);
-    mImg.data[i*4]=0; mImg.data[i*4+1]=m; mImg.data[i*4+2]=Math.round(m*0.6); mImg.data[i*4+3]=255;
-
-    const h=dir[i]*360;
-    const [rr,gg,bb]=hsl2rgb(h,0.9,0.5);
-    dImg.data[i*4]=rr; dImg.data[i*4+1]=gg; dImg.data[i*4+2]=bb; dImg.data[i*4+3]=255;
-  }
-
-  const tm=document.createElement('canvas'); tm.width=W; tm.height=H;
-  tm.getContext('2d').putImageData(mImg,0,0);
-  mCtx.imageSmoothingEnabled=false;
-  mCtx.drawImage(tm,0,0,W*S,H*S);
-
-  const td=document.createElement('canvas'); td.width=W; td.height=H;
-  td.getContext('2d').putImageData(dImg,0,0);
-  dCtx.imageSmoothingEnabled=false;
-  dCtx.drawImage(td,0,0,W*S,H*S);
-
-  // feature count estimate
-  const cellsX=Math.floor(W/3), cellsY=Math.floor(H/3);
-  const blocksX=cellsX-1, blocksY=cellsY-1;
-  const nFeat=blocksX*blocksY*4*8;
-  document.getElementById('s4-feat').textContent=`~${nFeat} features`;
+  const cX=Math.floor(W/3),cY=Math.floor(H/3);
+  const nF=(cX-1)*(cY-1)*4*8;
+  document.getElementById('t4-feat').textContent=`~${nF} features`;
+  document.getElementById('b4').textContent='done';
 }
 
-function hsl2rgb(h,s,l){
-  h/=360; const c=(1-Math.abs(2*l-1))*s;
-  const x=c*(1-Math.abs((h*6)%2-1)), m=l-c/2;
+function hsl(h,s,l){
+  h/=360; const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h*6)%2-1)), m=l-c/2;
   let r=0,g=0,b=0;
   if(h<1/6){r=c;g=x;}else if(h<2/6){r=x;g=c;}
   else if(h<3/6){g=c;b=x;}else if(h<4/6){g=x;b=c;}
@@ -790,98 +1120,120 @@ function hsl2rgb(h,s,l){
   return[Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
 }
 
-// ── SVM Result Viz ─────────────────────────────────────────────────────────
-function buildSVMViz(data){
+function showSVMResult(data){
   const all=['0','1','2','3','4','5','6','7','8','9','X'];
   const pred=data.predicted_label;
-  const chips=all.map(c=>{
-    const active=c===pred;
-    return `<div style="
-      display:inline-flex;align-items:center;justify-content:center;
-      width:38px;height:38px;border-radius:8px;margin:4px;
-      font-family:var(--fh);font-size:16px;font-weight:${active?800:400};
-      background:${active?'var(--accent)':'var(--surface2)'};
-      color:${active?'#000':'var(--muted)'};
-      border:1px solid ${active?'var(--accent)':'var(--border)'};
-      box-shadow:${active?'0 0 20px rgba(0,229,160,.4)':'none'};
-      transform:${active?'scale(1.15)':'scale(1)'};
-      transition:.2s;
-    ">${c}</div>`;
-  }).join('');
-  return `<div style="width:100%;text-align:center;padding:8px 0">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Decision boundary — model memilih kelas dengan skor tertinggi</div>
-    <div>${chips}</div>
-  </div>`;
+  const cls=document.getElementById('svmClasses');
+  cls.style.display='flex';
+  cls.innerHTML=all.map(c=>`
+    <div class="cls-chip ${c===pred?'winner':''}">${c}</div>
+  `).join('');
+  document.getElementById('svmResult').style.display='block';
+  document.getElementById('svmResult').textContent=pred;
+  document.getElementById('t5-res').textContent=`prediksi: "${pred}"`;
+  document.getElementById('b5').textContent='done';
 }
 
-// ── Step State Helpers ─────────────────────────────────────────────────────
-function activateStep(i){
-  document.getElementById(`step${i}`).classList.add('active');
-  return sleep(200);
+// ════════════════════════════════════════════
+// STEP STATE
+// ════════════════════════════════════════════
+function activate(i){
+  document.getElementById(`sr${i}`).classList.add('active');
+  document.getElementById(`b${i}`).textContent='processing…';
+  return sleep(160);
 }
-function doneStep(i){
-  document.getElementById(`step${i}`).classList.add('done');
+function done(i){
+  document.getElementById(`sr${i}`).classList.add('done');
+  document.getElementById(`b${i}`).textContent='done';
 }
-
-// ── UI Helpers ─────────────────────────────────────────────────────────────
-function showPipeline(){
-  const s=document.getElementById('pipelineSection');
-  s.classList.add('show');
-  // reset all steps
+function setProg(n){
+  document.getElementById('progFill').style.width=`${(n/6)*100}%`;
+  document.getElementById('progTxt').textContent=`${n}/6`;
+}
+function resetStepRows(){
   for(let i=0;i<6;i++){
-    const el=document.getElementById(`step${i}`);
-    el.classList.remove('active','done');
-    const cw=el.querySelectorAll('.canvas-wrap');
-    cw.forEach(w=>{ w.innerHTML='<div class="canvas-placeholder">Menunggu…</div>'; });
+    const r=document.getElementById(`sr${i}`);
+    r.classList.remove('active','done');
+    const b=document.getElementById(`b${i}`);
+    if(b) b.textContent='pending';
   }
-  document.getElementById('svmViz').innerHTML='<div class="canvas-placeholder">Menunggu hasil prediksi dari server…</div>';
-  document.getElementById('s5-result').textContent='prediksi: —';
-  document.getElementById('s3-thresh').textContent='threshold: —';
-  document.getElementById('s4-feat').textContent='— features';
+  // reset canvases
+  ['cw0','cw1','cw2','cw3','cw4a','cw4b'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML='<div class="cv-ph">—</div>';
+  });
+  document.getElementById('svmClasses').style.display='none';
+  document.getElementById('svmResult').style.display='none';
+  document.getElementById('t5-res').textContent='prediksi: —';
+  document.getElementById('t3-thresh').textContent='threshold: —';
+  document.getElementById('t4-feat').textContent='— features';
+  setProg(0);
+  document.getElementById('pipeSubtitle').textContent='Memproses gambar…';
 }
-function hidePipeline(){ document.getElementById('pipelineSection').classList.remove('show'); }
+function resetPipeline(){
+  document.getElementById('emptyState').style.display='block';
+  document.getElementById('pipeCard').classList.remove('show');
+  resetStepRows();
+}
 
+// ════════════════════════════════════════════
+// RESULT
+// ════════════════════════════════════════════
 function showResult(data){
   document.getElementById('resDigit').textContent=data.predicted_label;
-  document.getElementById('resValue').textContent=`Karakter "${data.predicted_label}"`;
+  document.getElementById('resHeading').textContent=`Karakter "${data.predicted_label}" terdeteksi`;
   const conf=Math.min(Math.max((data.confidence+2)/4,0),1)*100;
-  document.getElementById('confFill').style.width=conf.toFixed(1)+'%';
-  document.getElementById('confText').textContent=`Decision score: ${data.confidence.toFixed(4)}`;
-
-  document.getElementById('summaryRow').innerHTML=`
-    <div class="summary-chip">Resize <span class="chip-val">21×15 px</span></div>
-    <div class="summary-chip">Grayscale <span class="chip-val">rgb2gray</span></div>
-    <div class="summary-chip">Threshold <span class="chip-val">Otsu</span></div>
-    <div class="summary-chip">Features <span class="chip-val">HOG</span></div>
-    <div class="summary-chip">Classifier <span class="chip-val">SVM RBF</span></div>
-    <div class="summary-chip">File <span class="chip-val">${data.filename}</span></div>
+  document.getElementById('confBar').style.width=conf.toFixed(1)+'%';
+  document.getElementById('confMeta').textContent=`Decision score: ${data.confidence.toFixed(4)} · Confidence: ${conf.toFixed(1)}%`;
+  document.getElementById('resultChips').innerHTML=`
+    <div class="r-chip"><span class="r-chip-label">File</span><span class="r-chip-val">${data.filename}</span></div>
+    <div class="r-chip"><span class="r-chip-label">Resize</span><span class="r-chip-val">21×15 px</span></div>
+    <div class="r-chip"><span class="r-chip-label">Features</span><span class="r-chip-val">HOG</span></div>
+    <div class="r-chip"><span class="r-chip-label">Classifier</span><span class="r-chip-val">SVM RBF</span></div>
+    <div class="r-chip"><span class="r-chip-label">Kelas</span><span class="r-chip-val">${data.predicted_index} → "${data.predicted_label}"</span></div>
   `;
-  document.getElementById('resultCard').classList.add('show');
+  document.getElementById('resultBanner').classList.add('show');
 }
-function hideResult(){ document.getElementById('resultCard').classList.remove('show'); }
+function hideResult(){
+  document.getElementById('resultBanner').classList.remove('show');
+}
 
+// ════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════
 function showErr(msg){
   const b=document.getElementById('errBox');
-  b.textContent='⚠️ '+msg; b.classList.add('show');
+  document.getElementById('errTxt').textContent=msg;
+  b.classList.add('show');
 }
 function hideErr(){ document.getElementById('errBox').classList.remove('show'); }
-
 function setStatus(cls,txt){
-  document.getElementById('statusDot').className='dot '+cls;
-  document.getElementById('statusTxt').textContent=txt;
+  document.getElementById('sDot').className='s-dot '+cls;
+  document.getElementById('sTxt').textContent=txt;
 }
 
-// ── Health check on URL change ─────────────────────────────────────────────
-document.getElementById('apiUrl').addEventListener('change', async function(){
-  const base=this.value.trim().replace(/\/$/,'');
+// ── Health check on load & URL change ──────
+async function checkHealth(base){
   if(!base) return;
   try{
-    const r=await fetch(`${base}/health`);
+    const r=await fetch(`${base}/health`,{signal:AbortSignal.timeout(5000)});
     const d=await r.json();
-    setStatus(d.model_loaded?'ok':'err-dot',
-      d.model_loaded?'API siap — model termuat':'API online, model belum termuat');
-  }catch{ setStatus('err-dot','Tidak dapat terhubung ke API'); }
-});
+    if(d.model_loaded){
+      setStatus('live','API Terhubung · Model Siap');
+      document.getElementById('apiStatus').innerHTML='<span style="color:var(--lime)">● Online · model termuat</span>';
+    } else {
+      setStatus('err','Model belum termuat');
+      document.getElementById('apiStatus').innerHTML='<span style="color:var(--orange)">● Online · model tidak ditemukan</span>';
+    }
+  }catch{
+    setStatus('err','Tidak dapat terhubung');
+    document.getElementById('apiStatus').innerHTML='<span style="color:var(--rose)">● Offline</span>';
+  }
+}
+
+const apiInp = document.getElementById('apiUrl');
+apiInp.addEventListener('change', ()=>checkHealth(apiInp.value.trim().replace(/\/$/,'')));
+window.addEventListener('load', ()=>checkHealth(apiInp.value.trim().replace(/\/$/,'')));
 </script>
 </body>
 </html>
