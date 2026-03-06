@@ -866,7 +866,6 @@ async function runPipeline() {
   if(!selFile) return;
   const apiBase = document.getElementById('apiUrl').value.trim().replace(/\/$/,'');
   if(!apiBase){ showErr('Masukkan URL API terlebih dahulu.'); return; }
-  const apiKey = document.getElementById('apiKey') ? document.getElementById('apiKey').value.trim() : '';
 
   const btn = document.getElementById('btnRun');
   const txt = document.getElementById('btnTxt');
