@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Numbero</title>
-  <meta name="description" content="Mesin pengenal angka dengan visualisasi image processing real-time" />
+  <title>CharScan — AI Character Recognition</title>
+  <meta name="description" content="Pengenal karakter angka berbasis SVM dengan visualisasi image processing real-time" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Clash+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
@@ -510,7 +510,7 @@
   <!-- ── NAV ── -->
   <nav>
     <a href="#" class="nav-logo">
-      Numbero
+      CharScan
       <span class="logo-badge">Beta</span>
     </a>
     <div class="nav-pills">
@@ -528,9 +528,9 @@
   <section class="hero">
     <div class="hero-left">
       <div class="hero-eyebrow">SVM · Image Processing · Real-time</div>
-      <h1>Mesin <em>Pengenal angka</em><br/>dengan SVM</h1>
+      <h1>Kenali <em>Karakter</em><br/>dengan Presisi AI</h1>
       <p class="hero-desc">
-        Upload gambar angka (0–9) atau huruf X. Pipeline image processing divisualisasikan secara real-time.
+        Upload gambar karakter angka (0–9) atau huruf X. Pipeline image processing divisualisasikan secara real-time — dari piksel mentah hingga keputusan model SVM.
       </p>
       <div class="hero-stats">
         <div class="stat">
@@ -568,6 +568,8 @@
               value="https://martinmachine-penilaian-informatika.hf.space" />
           </div>
           <div class="inp-hint">Hugging Face Space — <span id="apiStatus" style="color:var(--mist)">memeriksa…</span></div>
+
+        </div>
       </div>
 
       <div style="height:16px"></div>
@@ -907,13 +909,8 @@ async function runPipeline() {
     // STEP 5 — SVM
     await activate(5); setProg(6);
     document.getElementById('pipeSubtitle').textContent = 'Mengirim ke server…';
-    const apiKey = document.getElementById('apiKey').value.trim();
-    if(!apiKey){ showErr('Masukkan API key terlebih dahulu.'); throw new Error('API key kosong'); }
     const fd = new FormData(); fd.append('file', selFile);
-    const res = await fetch(`${apiBase}/predict`,{
-      method:'POST', body:fd,
-      headers:{ 'X-API-Key': apiKey }
-    });
+    const res = await fetch(`${apiBase}/predict`,{method:'POST',body:fd});
     if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.detail||`HTTP ${res.status}`); }
     const data = await res.json();
     showSVMResult(data);
