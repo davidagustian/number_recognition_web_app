@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Numbero</title>
+  <title>CharScan — AI Character Recognition</title>
   <meta name="description" content="Pengenal karakter angka berbasis SVM dengan visualisasi image processing real-time" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Clash+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -496,6 +496,95 @@
       .result-inner { grid-template-columns:1fr; text-align:center; }
       .result-digit-wrap { margin:0 auto; }
     }
+
+    /* ════════════════════════════════════════════
+       COMMENT SECTION
+    ════════════════════════════════════════════ */
+    .comments-section {
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 40px 80px;
+    }
+    .comments-heading {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 28px;
+    }
+    .comments-title {
+      font-family: var(--fd); font-size: 22px; font-weight: 700;
+    }
+    .comments-count {
+      background: var(--lime-dim); color: var(--lime);
+      font-family: var(--fm); font-size: 11px; font-weight: 500;
+      padding: 4px 12px; border-radius: 100px;
+      border: 1px solid rgba(184,255,87,.3);
+    }
+
+    /* Form */
+    .comment-form {
+      background: var(--ink-2); border: 1px solid var(--line);
+      border-radius: var(--r-xl); padding: 28px;
+      margin-bottom: 24px;
+    }
+    .form-title {
+      font-family: var(--fm); font-size: 10px; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--mist); margin-bottom: 18px;
+    }
+    .form-inp {
+      width: 100%; background: var(--ink-3); border: 1px solid var(--line);
+      border-radius: var(--r-sm); color: var(--white); font-family: var(--fi);
+      font-size: 13px; padding: 12px 16px; outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-inp:focus { border-color: rgba(184,255,87,.5); box-shadow: 0 0 0 3px rgba(184,255,87,.08); }
+    .form-inp::placeholder { color: var(--mist); }
+    textarea.form-inp { resize: vertical; min-height: 90px; line-height: 1.6; }
+    .btn-submit {
+      background: var(--lime); color: #000;
+      font-family: var(--fd); font-size: 13px; font-weight: 700;
+      border: none; border-radius: var(--r-sm); padding: 12px 28px;
+      cursor: pointer; transition: .25s; margin-top: 4px;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--lime-glow); }
+    .btn-submit:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .form-feedback {
+      font-size: 12px; margin-top: 10px; display: none;
+      font-family: var(--fm); padding: 10px 14px; border-radius: var(--r-sm);
+    }
+    .form-feedback.success { display: block; background: rgba(184,255,87,.1); color: var(--lime); border: 1px solid rgba(184,255,87,.25); }
+    .form-feedback.error   { display: block; background: rgba(255,79,123,.08); color: var(--rose); border: 1px solid rgba(255,79,123,.25); }
+
+    /* List */
+    .comments-list { display: flex; flex-direction: column; gap: 12px; }
+    .comment-card {
+      background: var(--ink-2); border: 1px solid var(--line);
+      border-radius: var(--r-lg); padding: 20px 24px;
+      animation: fadeUp .3s ease both;
+      transition: border-color .2s;
+    }
+    .comment-card:hover { border-color: var(--line-2); }
+    .comment-meta {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    }
+    .comment-avatar {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--fd); font-size: 14px; font-weight: 700; color: #000;
+    }
+    .comment-name { font-size: 13px; font-weight: 600; color: var(--white); }
+    .comment-time { font-size: 11px; color: var(--mist); font-family: var(--fm); margin-left: auto; }
+    .comment-text { font-size: 13px; color: var(--snow); line-height: 1.7; }
+    .comments-empty {
+      text-align: center; padding: 48px 24px;
+      background: var(--ink-2); border: 1px dashed var(--line);
+      border-radius: var(--r-xl); color: var(--mist); font-size: 13px;
+    }
+    .comments-loading {
+      text-align: center; padding: 32px;
+      color: var(--mist); font-family: var(--fm); font-size: 12px;
+    }
+
+    @media(max-width:900px){
+      .comments-section { padding: 0 20px 60px; }
+    }
   </style>
 </head>
 <body>
@@ -527,10 +616,10 @@
   <!-- ── HERO ── -->
   <section class="hero">
     <div class="hero-left">
-      <div class="hero-eyebrow">SVM · Image Processing · Real-time</div>
-      <h1>Mesin <em>pengenal</em><br/>angka dengan SVM</h1>
+      <div class="hero-eyebrow">ML· Image Processing · Real-time</div>
+      <h1>Mesin <em>SVM</em><br/>pengenal angka</h1>
       <p class="hero-desc">
-        Upload gambar angka (0–9) atau huruf X. visualisasi proses real-time.
+        Upload gambar angka (0–9) atau huruf X. Visualisasi pipeline image processing secara real-time.
       </p>
       <div class="hero-stats">
         <div class="stat">
@@ -555,24 +644,6 @@
 
     <!-- LEFT: Input Panel -->
     <div>
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Konfigurasi</div>
-        </div>
-        <div class="panel-body">
-          <div class="field-label">URL Backend API</div>
-          <div class="inp-wrap">
-            <span class="inp-icon">🔗</span>
-            <input class="inp" id="apiUrl" type="text"
-              placeholder="https://username-spacename.hf.space"
-              value="https://martinmachine-penilaian-informatika.hf.space" />
-          </div>
-          <div class="inp-hint">Hugging Face Space — <span id="apiStatus" style="color:var(--mist)">memeriksa…</span></div>
-
-        </div>
-      </div>
-
-      <div style="height:16px"></div>
 
       <div class="panel">
         <div class="panel-head">
@@ -801,6 +872,36 @@
     </div><!-- /right-panel -->
   </main>
 
+
+  <!-- ── COMMENTS ── -->
+  <section class="comments-section">
+    <div class="comments-heading">
+      <div class="comments-title">💬 Komentar</div>
+      <div class="comments-count" id="commentsCount">0 komentar</div>
+    </div>
+
+    <!-- Form -->
+    <div class="comment-form">
+      <div class="form-title">Tulis Komentar</div>
+      <input class="form-inp" id="cNama" type="text" placeholder="Nama Anda" maxlength="50" style="margin-bottom:12px" />
+      <textarea class="form-inp" id="cKomentar" placeholder="Tulis komentar, pertanyaan, atau masukan Anda di sini…" maxlength="500"></textarea>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:12px">
+        <div style="font-size:11px; color:var(--mist); font-family:var(--fm)">
+          <span id="charCount">0</span>/500 karakter
+        </div>
+        <button class="btn-submit" id="btnSubmit" onclick="submitKomentar()">
+          Kirim Komentar →
+        </button>
+      </div>
+      <div class="form-feedback" id="formFeedback"></div>
+    </div>
+
+    <!-- List -->
+    <div id="commentsList">
+      <div class="comments-loading">⏳ Memuat komentar…</div>
+    </div>
+  </section>
+
   <!-- ── FOOTER ── -->
   <footer>
     <div class="foot-logo">Numbero</div>
@@ -813,6 +914,10 @@
 </div><!-- /page -->
 
 <script>
+// ════════════════════════════════════════════
+// CONFIG — ganti URL di sini jika backend berubah
+const API_URL = 'https://martinmachine-penilaian-informatika.hf.space';
+
 // ════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════
@@ -864,7 +969,7 @@ function clearFile() {
 // ════════════════════════════════════════════
 async function runPipeline() {
   if(!selFile) return;
-  const apiBase = document.getElementById('apiUrl').value.trim().replace(/\/$/,'');
+  const apiBase = API_URL;
   if(!apiBase){ showErr('Masukkan URL API terlebih dahulu.'); return; }
 
   const btn = document.getElementById('btnRun');
@@ -1180,9 +1285,145 @@ async function checkHealth(base){
   }
 }
 
-const apiInp = document.getElementById('apiUrl');
-apiInp.addEventListener('change', ()=>checkHealth(apiInp.value.trim().replace(/\/$/,'')));
-window.addEventListener('load', ()=>checkHealth(apiInp.value.trim().replace(/\/$/,'')));
+window.addEventListener('load', ()=>checkHealth(API_URL));
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ════════════════════════════════════════════
+// SUPABASE CONFIG
+// ════════════════════════════════════════════
+const SUPA_URL  = 'https://aiduknxgzwwluqulvozb.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpZHVrbnhnend3bHVxdWx2b3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTUwNDMsImV4cCI6MjA4ODQ3MTA0M30.UVtdlLRoOcTTvCn6ILqMzmBkDjEXxpZ35OBQMzeYSeQ';
+const supa      = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── Avatar warna berdasarkan nama ──────────
+const AVATAR_COLORS = ['#b8ff57','#3df5e0','#ff7a3d','#7c6dfa','#ff4f7b','#ffd166'];
+function getColor(nama) {
+  let hash = 0;
+  for(let i=0; i<nama.length; i++) hash = nama.charCodeAt(i) + ((hash<<5)-hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+function getInitial(nama) { return nama.trim().charAt(0).toUpperCase(); }
+
+// ── Format waktu ───────────────────────────
+function timeAgo(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if(diff < 60)    return 'baru saja';
+  if(diff < 3600)  return `${Math.floor(diff/60)} menit lalu`;
+  if(diff < 86400) return `${Math.floor(diff/3600)} jam lalu`;
+  return new Date(dateStr).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'});
+}
+
+// ── Render komentar ────────────────────────
+function renderKomentar(data) {
+  const list = document.getElementById('commentsList');
+  document.getElementById('commentsCount').textContent = `${data.length} komentar`;
+
+  if(data.length === 0) {
+    list.innerHTML = `<div class="comments-empty">
+      💬 Belum ada komentar. Jadilah yang pertama!
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = `<div class="comments-list">${
+    data.map(c => `
+      <div class="comment-card">
+        <div class="comment-meta">
+          <div class="comment-avatar" style="background:${getColor(c.nama)}">
+            ${getInitial(c.nama)}
+          </div>
+          <div>
+            <div class="comment-name">${escHtml(c.nama)}</div>
+          </div>
+          <div class="comment-time">${timeAgo(c.created_at)}</div>
+        </div>
+        <div class="comment-text">${escHtml(c.komentar).replace(/\n/g,'<br/>')}</div>
+      </div>
+    `).join('')
+  }</div>`;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Load komentar ──────────────────────────
+async function loadKomentar() {
+  try {
+    const { data, error } = await supa
+      .from('comments')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if(error) throw error;
+    renderKomentar(data);
+  } catch(e) {
+    document.getElementById('commentsList').innerHTML =
+      `<div class="comments-empty">⚠️ Gagal memuat komentar: ${e.message}</div>`;
+  }
+}
+
+// ── Submit komentar ────────────────────────
+async function submitKomentar() {
+  const nama     = document.getElementById('cNama').value.trim();
+  const komentar = document.getElementById('cKomentar').value.trim();
+  const feedback = document.getElementById('formFeedback');
+  const btn      = document.getElementById('btnSubmit');
+
+  // Validasi
+  if(!nama)     { showFeedback('error', '⚠️ Nama tidak boleh kosong.'); return; }
+  if(!komentar) { showFeedback('error', '⚠️ Komentar tidak boleh kosong.'); return; }
+  if(komentar.length < 3) { showFeedback('error', '⚠️ Komentar terlalu pendek.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Mengirim…';
+
+  try {
+    const { error } = await supa
+      .from('comments')
+      .insert([{ nama, komentar }]);
+    if(error) throw error;
+
+    // Reset form
+    document.getElementById('cNama').value = '';
+    document.getElementById('cKomentar').value = '';
+    document.getElementById('charCount').textContent = '0';
+
+    showFeedback('success', '✅ Komentar berhasil dikirim! Terima kasih.');
+    await loadKomentar();
+
+  } catch(e) {
+    showFeedback('error', `⚠️ Gagal mengirim: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Kirim Komentar →';
+  }
+}
+
+function showFeedback(type, msg) {
+  const el = document.getElementById('formFeedback');
+  el.className = `form-feedback ${type}`;
+  el.textContent = msg;
+  setTimeout(() => { el.style.display = 'none'; el.className = 'form-feedback'; }, 4000);
+}
+
+// ── Character counter ──────────────────────
+document.getElementById('cKomentar').addEventListener('input', function() {
+  document.getElementById('charCount').textContent = this.value.length;
+});
+
+// ── Realtime update ────────────────────────
+supa.channel('comments-channel')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' },
+    () => loadKomentar()
+  ).subscribe();
+
+// Load saat halaman dibuka
+loadKomentar();
+</script>
+
 </body>
 </html>
